@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Cobranzas - ISO 9001</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <!-- Navbar -->
+    <nav class="bg-blue-900 text-white p-4 shadow-lg">
+        <div class="container mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <i class="fa-solid fa-chart-line text-2xl"></i>
+                <h1 class="text-xl font-bold tracking-wide">Gestión de Cobranzas</h1>
+            </div>
+            <div class="text-sm opacity-80 flex items-center gap-2">
+                <span id="currentDateDisplay"></span> 
+                <span>| Panel v3.4 (Google Sheets)</span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto p-4 md:p-6 space-y-6">
+
+        <!-- Data Load & Diagnostic Area -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Google Sheets Input -->
+            <div class="bg-white p-6 rounded-lg shadow-md border border-slate-200">
+                <h2 class="text-lg font-semibold mb-4 text-slate-700 flex items-center gap-2">
+                    <i class="fa-brands fa-google text-green-600"></i> 1. Conexión a Google Sheets
+                </h2>
+                <div class="flex flex-col gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Enlace de la Hoja (Público/Compartido)</label>
+                        <input type="text" id="sheetUrlInput" 
+                               value="https://docs.google.com/spreadsheets/d/1wVjmZDIWLZvwunf7NrkqSh91yE2e31a286Y0zFDsZRE/edit?usp=sharing" 
+                               class="w-full border-gray-300 rounded-md shadow-sm p-2 border text-sm focus:ring-blue-500 focus:border-blue-500 text-slate-600"
+                               placeholder="Pega aquí el link de Google Sheets..." />
+                    </div>
+                    <button id="loadSheetBtn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition flex justify-center items-center gap-2">
+                        <span id="btnSpinner" class="hidden animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
+                        <span id="btnText">Importar Datos</span>
+                    </button>
+                    <p class="text-xs text-slate-400">Nota: La hoja debe tener permisos de "Cualquiera con el enlace puede ver".</p>
+                </div>
+            </div>
+
+            <!-- Diagnostic Panel -->
+            <div id="diagnosticPanel" class="hidden bg-yellow-50 p-6 rounded-lg shadow-md border border-yellow-200">
+                <h2 class="text-lg font-bold mb-2 text-yellow-800"><i class="fa-solid fa-stethoscope mr-2"></i>Diagnóstico de Datos</h2>
+                <div class="text-sm space-y-2 text-yellow-900">
+                    <div class="flex justify-between">
+                        <span>Filas Totales Leídas:</span>
+                        <span class="font-bold" id="diagTotalRows">0</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Filas con Errores de Lectura:</span>
+                        <span class="font-bold text-red-600" id="diagErrors">0</span>
+                    </div>
+                    <div id="errorDetails" class="hidden mt-2 p-2 bg-red-100 text-red-800 text-xs rounded border border-red-200 max-h-32 overflow-y-auto">
+                        <!-- Errors injected here -->
+                    </div>
+                    <hr class="border-yellow-300 my-2">
+                    <div class="flex justify-between">
+                        <span>Filas identificadas en <span id="diagMonthName" class="font-bold">...</span>:</span>
+                        <span class="font-bold text-blue-800" id="diagMonthCount">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filters (Hidden Initially) -->
+        <div id="filterSection" class="hidden bg-white p-6 rounded-lg shadow-md border border-slate-200">
+            <h2 class="text-lg font-semibold mb-4 text-slate-700">2. Filtro Operativo</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Mes de Vencimiento</label>
+                    <select id="monthFilter" class="w-full border-gray-300 rounded-md shadow-sm p-2 border focus:ring-blue-500 focus:border-blue-500">
+                        <option value="TODOS">Todos</option>
+                    </select>
+                </div>
+                <div class="flex items-end">
+                    <button id="applyFiltersBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition">
+                        Actualizar Tablero
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- KPI Cards -->
+        <div id="kpiSection" class="hidden grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div class="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500 card">
+                <div class="text-slate-500 text-sm font-semibold uppercase">Total Casos</div>
+                <div class="text-3xl font-bold mt-1" id="kpiTotal">0</div>
+            </div>
+            
+            <div class="bg-white p-4 rounded-lg shadow border-l-4 border-green-500 card">
+                <div class="text-slate-500 text-sm font-semibold uppercase">Cantidad Cobrada</div>
+                <div class="text-3xl font-bold mt-1 text-green-700" id="kpiCollected">0</div>
+                <div class="text-xs text-slate-400 mt-1">Casos cerrados</div>
+            </div>
+            
+            <div class="bg-white p-4 rounded-lg shadow border-l-4 border-yellow-500 card">
+                <div class="text-slate-500 text-sm font-semibold uppercase">Cobradas</div>
+                <div class="text-3xl font-bold mt-1" id="kpiEfficiencyNet">0%</div>
+                <div class="text-xs text-slate-400 mt-1">Vs. Total Sin Bajas</div>
+            </div>
+            
+            <div class="bg-white p-4 rounded-lg shadow border-l-4 border-orange-500 card">
+                <div class="text-slate-500 text-sm font-semibold uppercase">Bajas (Excluidos)</div>
+                <div class="text-3xl font-bold mt-1" id="kpiBajas">0</div>
+                <div class="text-xs text-slate-400 mt-1">Susp. / No Cobra</div>
+            </div>
+            
+            <div class="bg-white p-4 rounded-lg shadow border-l-4 border-red-500 card">
+                <div class="text-slate-500 text-sm font-semibold uppercase">Alerta (>3 días)</div>
+                <div class="text-3xl font-bold mt-1 text-red-600" id="kpiStagnant">0</div>
+                <div class="text-xs text-slate-400 mt-1">Requieren gestión</div>
+            </div>
+        </div>
+
+        <!-- Dashboard Content -->
+        <div id="dashboardContent" class="hidden grid grid-cols-1 gap-6">
+            
+            <!-- Status Chart -->
+            <div class="bg-white p-6 rounded-lg shadow flex flex-col items-center">
+                <h3 class="font-bold text-slate-700 mb-4 w-full text-left">Distribución Activa <span class="text-xs text-slate-500 font-normal">(Sin Reclamos/Bajas)</span></h3>
+                <div class="h-80 w-full max-w-2xl flex items-center justify-center">
+                    <canvas id="statusChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Collectors Table -->
+            <div class="bg-white p-4 rounded-lg shadow overflow-x-auto">
+                <h3 class="font-bold text-slate-700 mb-4">Desempeño por Responsable</h3>
+                <table class="min-w-full text-sm text-left text-slate-600">
+                    <thead class="text-xs text-slate-700 uppercase bg-slate-100">
+                        <tr>
+                            <th class="px-6 py-3">Responsable</th>
+                            <th class="px-6 py-3">Total Asignado</th>
+                            <th class="px-6 py-3 text-green-700">Cobradas</th>
+                            <th class="px-6 py-3 text-red-600">Alerta (+3 días)</th>
+                            <th class="px-6 py-3">Última Gestión</th>
+                        </tr>
+                    </thead>
+                    <tbody id="collectorsTableBody"></tbody>
+                </table>
+            </div>
+
+            <!-- Stagnant Lists -->
+            <div class="bg-white p-4 rounded-lg shadow">
+                <h3 class="font-bold text-slate-800 mb-6 flex items-center gap-2 text-lg border-b pb-2">
+                    <i class="fa-solid fa-bell text-red-500"></i> Casos sin movimiento (> 3 días)
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-red-50 rounded-lg p-3 border border-red-100">
+                        <h4 class="font-bold text-red-800 mb-3 flex justify-between"><span><i class="fa-solid fa-triangle-exclamation mr-2"></i>RECLAMOS</span><span class="bg-red-200 text-red-800 text-xs px-2 py-1 rounded-full" id="count-reclamos">0</span></h4>
+                        <div class="overflow-y-auto max-h-80 space-y-2" id="list-reclamos"></div>
+                    </div>
+                    <div class="bg-blue-50 rounded-lg p-3 border border-blue-100">
+                        <h4 class="font-bold text-blue-800 mb-3 flex justify-between"><span><i class="fa-solid fa-file-invoice-dollar mr-2"></i>PENDIENTES PAGO</span><span class="bg-blue-200 text-blue-800 text-xs px-2 py-1 rounded-full" id="count-facturas">0</span></h4>
+                        <div class="overflow-y-auto max-h-80 space-y-2" id="list-facturas"></div>
+                    </div>
+                    <div class="bg-yellow-50 rounded-lg p-3 border border-yellow-100">
+                        <h4 class="font-bold text-yellow-800 mb-3 flex justify-between"><span><i class="fa-solid fa-phone mr-2"></i>CONTACTADO</span><span class="bg-yellow-200 text-yellow-800 text-xs px-2 py-1 rounded-full" id="count-contactos">0</span></h4>
+                        <div class="overflow-y-auto max-h-80 space-y-2" id="list-contactos"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let rawData = [];
+        let parseErrors = [];
+        let statusChartInstance = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const today = new Date();
+            document.getElementById('currentDateDisplay').textContent = 'Fecha: ' + today.toLocaleDateString('es-AR');
+        });
+
+        // --- GOOGLE SHEETS IMPORT LOGIC ---
+        document.getElementById('loadSheetBtn').addEventListener('click', async () => {
+            const urlInput = document.getElementById('sheetUrlInput').value;
+            const spinner = document.getElementById('btnSpinner');
+            const btnText = document.getElementById('btnText');
+
+            if (!urlInput) {
+                alert("Por favor ingresa un enlace de Google Sheets.");
+                return;
+            }
+
+            // Extract Spreadsheet ID
+            // Pattern: /d/([a-zA-Z0-9-_]+)
+            const match = urlInput.match(/\/d\/([a-zA-Z0-9-_]+)/);
+            if (!match || !match[1]) {
+                alert("El enlace no parece válido. Asegúrate de copiar el link completo de Google Sheets.");
+                return;
+            }
+            const sheetId = match[1];
+            const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
+
+            // UI Loading State
+            spinner.classList.remove('hidden');
+            btnText.textContent = "Cargando...";
+            
+            try {
+                const response = await fetch(csvUrl);
+                if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
+                const csvText = await response.text();
+
+                // Process CSV Text with PapaParse
+                Papa.parse(csvText, {
+                    header: false,
+                    skipEmptyLines: true,
+                    quoteChar: '"',
+                    escapeChar: '"',
+                    complete: function(results) {
+                        handleParseResults(results);
+                        spinner.classList.add('hidden');
+                        btnText.textContent = "Datos Actualizados";
+                        setTimeout(() => btnText.textContent = "Importar Datos", 2000);
+                    }
+                });
+
+            } catch (error) {
+                console.error(error);
+                alert("Error al cargar la hoja. Asegúrate de que el enlace sea público o visible para 'Cualquiera con el enlace'.\n\nDetalle: " + error.message);
+                spinner.classList.add('hidden');
+                btnText.textContent = "Importar Datos";
+            }
+        });
+
+        function handleParseResults(results) {
+            parseErrors = results.errors;
+            const totalRowsRead = results.data.length;
+            
+            if (totalRowsRead > 1) {
+                rawData = results.data.slice(1); // Remove header
+            } else {
+                rawData = [];
+            }
+
+            console.log("Filas leídas:", totalRowsRead);
+            updateDiagnosticPanel(totalRowsRead, parseErrors);
+
+            populateMonthFilter();
+            document.getElementById('filterSection').classList.remove('hidden');
+            runDashboard(); // Auto-run if possible
+        }
+
+        // --- CORE LOGIC: CATEGORIZACIÓN ---
+        function categorizeStatus(statusRaw) {
+            const s = (statusRaw || '').toUpperCase();
+            
+            if (s.includes('NO SE COBRA') || s.includes('SUSPENDIDO') || s.includes('BONIFICADA') || s.includes('EXCLUIDO')) return 'EXCLUIDO';
+            if (s.includes('RECLAMO') || s.includes('DISPUTA') || s.includes('ERROR') || s.includes('PROBLEMA') || s.includes('DEVUELT')) return 'RECLAMOS';
+            
+            const isExplicitSuccess = s.includes('YA PAGO') || s.includes('PAGADO') || s.includes('COBRADA') || s.includes('COBRADO') || s.includes('ABONADO') || s.includes('CERRAD');
+            if (isExplicitSuccess) return 'COBRADAS'; 
+
+            if (s.includes('FACTURA') || s.includes('FC') || s.includes('ENVIAD') || s.includes('ADMIN') || s.includes('NOTA DE') || s.includes('PENDIENTE') || s.includes('ESPERA') || s.includes('PAGO') || s.includes('A PAGAR')) return 'PENDIENTES_PAGO'; 
+
+            return 'CONTACTADO'; 
+        }
+
+        function updateDiagnosticPanel(total, errors) {
+            const panel = document.getElementById('diagnosticPanel');
+            panel.classList.remove('hidden');
+            document.getElementById('diagTotalRows').textContent = total;
+            document.getElementById('diagErrors').textContent = errors.length;
+            
+            const errDiv = document.getElementById('errorDetails');
+            if (errors.length > 0) {
+                errDiv.classList.remove('hidden');
+                errDiv.innerHTML = errors.map(e => `<div>Fila ${e.row}: ${e.message}</div>`).join('');
+            } else {
+                errDiv.classList.add('hidden');
+                errDiv.innerHTML = '';
+            }
+        }
+
+        document.getElementById('applyFiltersBtn').addEventListener('click', runDashboard);
+
+        function populateMonthFilter() {
+            const months = new Set();
+            rawData.forEach(row => {
+                if (row.length > 8) {
+                    const month = row[8]; 
+                    if (month) months.add(month.trim().toUpperCase());
+                }
+            });
+            const select = document.getElementById('monthFilter');
+            select.innerHTML = '<option value="TODOS">Todos</option>';
+            Array.from(months).sort().forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m;
+                opt.textContent = m;
+                select.appendChild(opt);
+            });
+        }
+
+        function parseDate(dateStr) {
+            if (!dateStr || typeof dateStr !== 'string') return null;
+            const parts = dateStr.split(' ');
+            const dateParts = parts[0].split('/'); 
+            if (dateParts.length < 3) return null;
+            const year = parseInt(dateParts[2], 10);
+            const monthIndex = parseInt(dateParts[1], 10) - 1;
+            const day = parseInt(dateParts[0], 10);
+            const dateOnly = new Date(year, monthIndex, day, 0, 0, 0); 
+            if (isNaN(dateOnly.getTime())) return null;
+            return dateOnly;
+        }
+
+        function getDaysDiff(dateObj) {
+            if (!dateObj) return 999;
+            const MS_PER_DAY = 1000 * 60 * 60 * 24;
+            const now = new Date();
+            const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+            const diffTime = todayMidnight.getTime() - dateObj.getTime();
+            return Math.floor(diffTime / MS_PER_DAY); 
+        }
+
+        function runDashboard() {
+            const QUIEN_COBRA_INDEX = 13;
+            const ESTADO_INDEX = 14;
+            const FECHA_CAMBIO_INDEX = 15;
+
+            const selectedMonth = document.getElementById('monthFilter').value;
+            document.getElementById('diagMonthName').textContent = selectedMonth === 'TODOS' ? 'Total' : selectedMonth;
+
+            let total = 0;
+            let cobradas = 0;
+            let stagnantTotal = 0;
+            let bajasTotal = 0;
+            
+            const categoryCounts = { 'RECLAMOS': 0, 'PENDIENTES_PAGO': 0, 'CONTACTADO': 0, 'COBRADAS': 0, 'EXCLUIDO': 0 };
+            const stagnantGroups = { 'RECLAMOS': [], 'PENDIENTES_PAGO': [], 'CONTACTADO': [] };
+            const collectorStats = {};
+            
+            let diagnosticMonthMatchCount = 0;
+
+            rawData.forEach(row => {
+                if (row.length < 10) return; 
+
+                const rowMonth = (row[8] || '').trim().toUpperCase();
+                if (selectedMonth === 'TODOS' || rowMonth === selectedMonth) {
+                    diagnosticMonthMatchCount++;
+                }
+
+                if (selectedMonth !== 'TODOS' && rowMonth !== selectedMonth) return;
+
+                total++;
+                const collector = (row[QUIEN_COBRA_INDEX] || 'SIN ASIGNAR').trim().toUpperCase();
+                const statusRaw = (row[ESTADO_INDEX] || 'SIN ESTADO').trim();
+                const dateStr = row[FECHA_CAMBIO_INDEX];
+                const dateObj = parseDate(dateStr);
+                const daysDiff = getDaysDiff(dateObj);
+                
+                const category = categorizeStatus(statusRaw);
+                categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+
+                if (category === 'EXCLUIDO') bajasTotal++;
+
+                if (!collectorStats[collector]) collectorStats[collector] = { name: collector, total: 0, cobrada: 0, stagnant: 0, lastDate: null };
+                
+                const fullDateParts = dateStr && dateStr.includes(' ') ? (dateStr.split(' ')[1] || '00:00:00').split(':') : ['00','00','00'];
+                const fullDateObj = dateObj ? new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate(), fullDateParts[0], fullDateParts[1], fullDateParts[2]) : null;
+                
+                if (fullDateObj) {
+                    if (!collectorStats[collector].lastDate || fullDateObj > collectorStats[collector].lastDate) {
+                        collectorStats[collector].lastDate = fullDateObj;
+                    }
+                }
+
+                collectorStats[collector].total++;
+
+                if (category === 'COBRADAS') {
+                    cobradas++;
+                    collectorStats[collector].cobrada++;
+                } else if (category !== 'EXCLUIDO') {
+                    if (daysDiff > 3 || daysDiff === 999) {
+                        stagnantTotal++;
+                        collectorStats[collector].stagnant++;
+                        if (stagnantGroups[category]) {
+                            stagnantGroups[category].push({
+                                client: row[2] || row[4] || 'Cliente Desconocido',
+                                collector: collector,
+                                rawStatus: statusRaw,
+                                dateStr: dateStr || 'Sin Fecha',
+                                days: daysDiff
+                            });
+                        }
+                    }
+                }
+            });
+
+            document.getElementById('diagMonthCount').textContent = diagnosticMonthMatchCount;
+
+            const finalAdjustedTotal = total - bajasTotal;
+            document.getElementById('kpiSection').classList.remove('hidden');
+            document.getElementById('dashboardContent').classList.remove('hidden');
+
+            document.getElementById('kpiTotal').textContent = total;
+            document.getElementById('kpiStagnant').textContent = stagnantTotal;
+            document.getElementById('kpiBajas').textContent = bajasTotal;
+
+            const conversionRate = finalAdjustedTotal > 0 ? Math.round((cobradas / finalAdjustedTotal) * 100) : 0;
+            
+            document.getElementById('kpiCollected').textContent = cobradas;
+            document.getElementById('kpiEfficiencyNet').textContent = conversionRate + '%';
+
+            updateStatusChart(categoryCounts);
+            renderCollectorsTable(collectorStats);
+            renderStagnantGroup('list-reclamos', 'count-reclamos', stagnantGroups['RECLAMOS'], 'bg-white border-l-4 border-red-500');
+            renderStagnantGroup('list-facturas', 'count-facturas', stagnantGroups['PENDIENTES_PAGO'], 'bg-white border-l-4 border-blue-500');
+            renderStagnantGroup('list-contactos', 'count-contactos', stagnantGroups['CONTACTADO'], 'bg-white border-l-4 border-yellow-500');
+        }
+
+        function renderCollectorsTable(stats) {
+            const tbody = document.getElementById('collectorsTableBody');
+            tbody.innerHTML = '';
+            const sortedStats = Object.values(stats)
+                .filter(stat => stat.total > 0 || stat.name !== 'SIN ASIGNAR')
+                .sort((a, b) => b.total - a.total);
+
+            sortedStats.forEach(stat => {
+                const tr = document.createElement('tr');
+                tr.className = "bg-white border-b hover:bg-slate-50";
+                const lastInteraction = stat.lastDate ? stat.lastDate.toLocaleDateString('es-AR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-';
+                tr.innerHTML = `
+                    <td class="px-6 py-4 font-medium text-slate-900">${stat.name}</td>
+                    <td class="px-6 py-4">${stat.total}</td>
+                    <td class="px-6 py-4 text-green-600 font-bold">${stat.cobrada}</td>
+                    <td class="px-6 py-4 text-red-600 font-bold">${stat.stagnant}</td>
+                    <td class="px-6 py-4 text-slate-500 text-xs">${lastInteraction}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderStagnantGroup(containerId, countId, items, cardClass) {
+            const container = document.getElementById(containerId);
+            const countLabel = document.getElementById(countId);
+            container.innerHTML = '';
+            countLabel.textContent = items.length;
+            items.sort((a,b) => b.days - a.days);
+
+            if (items.length === 0) {
+                container.innerHTML = '<div class="text-xs text-slate-400 italic p-2">¡Todo al día!</div>';
+                return;
+            }
+
+            items.forEach(item => {
+                const div = document.createElement('div');
+                div.className = `${cardClass} p-3 rounded shadow-sm text-sm`;
+                const daysText = item.days === 999 ? 'Sin fecha' : `${item.days} días`;
+                div.innerHTML = `
+                    <div class="font-bold text-slate-700 truncate" title="${item.client}">${item.client}</div>
+                    <div class="flex justify-between items-center mt-1">
+                        <span class="text-xs text-slate-500 bg-slate-100 px-1 rounded">${item.collector}</span>
+                        <span class="font-bold text-red-600 text-xs">${daysText}</span>
+                    </div>
+                    <div class="mt-2 text-xs text-slate-500 border-t pt-1">
+                        Estado: <span class="italic">${item.rawStatus}</span>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function updateStatusChart(dataObj) {
+            const ctx = document.getElementById('statusChart').getContext('2d');
+            if (statusChartInstance) statusChartInstance.destroy();
+            const internalLabels = ['PENDIENTES_PAGO', 'CONTACTADO', 'COBRADAS'];
+            const displayLabels = ['PENDIENTES DE PAGO', 'CONTACTADO', 'COBRADAS'];
+            let totalForChart = 0;
+            internalLabels.forEach(key => totalForChart += (dataObj[key] || 0));
+            const data = internalLabels.map(key => dataObj[key] || 0);
+            const percentageLabels = data.map((value, index) => {
+                const percent = totalForChart > 0 ? Math.round((value / totalForChart) * 100) : 0;
+                return `${displayLabels[index]} (${percent}%)`;
+            });
+            
+            statusChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: percentageLabels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: ['#3b82f6', '#eab308', '#22c55e'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } }
+                }
+            });
+        }
+    </script>
+</body>
+</html>

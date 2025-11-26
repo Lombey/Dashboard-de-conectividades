@@ -31,7 +31,7 @@
             </div>
             <div class="text-sm opacity-90 flex items-center gap-2 font-semibold">
                 <span id="currentDateDisplay"></span> 
-                <span>| Panel v3.44</span>
+                <span>| Panel v3.45</span>
             </div>
         </div>
     </nav>
@@ -380,8 +380,37 @@
                 btn.classList.add('bg-green-600', 'hover:bg-green-700');
                 btnText.textContent = "Datos Actualizados";
                 filterSelect.disabled = false;
+                
+                // --- CAMBIO CLAVE AQUÍ: Seleccionar el mes actual ---
+                const monthFilter = document.getElementById('monthFilter');
+                const currentMonthName = new Date().toLocaleDateString('es-AR', { month: 'long' }).toUpperCase();
+                
+                let monthToSelect = 'TODOS';
+                // Buscar el mes actual en las opciones (o el más cercano si hay variaciones)
+                for (const option of monthFilter.options) {
+                    if (option.value === currentMonthName) {
+                        monthToSelect = currentMonthName;
+                        break;
+                    }
+                }
+                
+                // Si encontramos el mes actual, lo seleccionamos.
+                if (monthToSelect !== 'TODOS') {
+                    monthFilter.value = monthToSelect;
+                } else {
+                    // Si no está el mes actual, seleccionamos el último mes en la lista para tener algo cargado
+                    if (monthFilter.options.length > 1) {
+                         monthFilter.value = monthFilter.options[monthFilter.options.length - 1].value;
+                    }
+                }
+                
+                // Y luego ejecutamos el dashboard con la nueva selección
+                runDashboard();
+                
+                // Restaurar visibilidad
                 document.getElementById('kpiSection').classList.remove('hidden');
                 document.getElementById('dashboardContent').classList.remove('hidden');
+                
                 setTimeout(() => {
                     btn.classList.remove('bg-green-600', 'hover:bg-green-700');
                     btn.classList.add('bg-[#9bc438]', 'hover:bg-green-600'); 
@@ -425,7 +454,7 @@
             if (totalRowsRead > 1) {
                 rawData = results.data.slice(1);
                 populateMonthFilter();
-                runDashboard();
+                // runDashboard() is now called inside finishLoading()
             } else {
                 throw new Error("Datos insuficientes.");
             }

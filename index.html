@@ -30,7 +30,7 @@
             </div>
             <div class="text-sm opacity-80 flex items-center gap-2">
                 <span id="currentDateDisplay"></span> 
-                <span>| Panel v3.39</span>
+                <span>| Panel v3.40</span>
             </div>
         </div>
     </nav>
@@ -192,8 +192,6 @@
         document.addEventListener('DOMContentLoaded', () => {
             const today = new Date();
             document.getElementById('currentDateDisplay').textContent = 'Fecha: ' + today.toLocaleDateString('es-AR');
-            // Carga inicial de datos
-            loadDataFromSheet();
         });
 
         document.getElementById('importBtn').addEventListener('click', loadDataFromSheet);
@@ -425,16 +423,11 @@
         // --- CORE CALCULATIONS ---
         function categorizeStatus(statusRaw) {
             const s = (statusRaw || '').toUpperCase();
-            // EXCLUIDO: Bonificada, Suspendida, No se cobra
             if (s.includes('NO SE COBRA') || s.includes('SUSPENDIDO') || s.includes('BONIFICADA') || s.includes('EXCLUIDO')) return 'EXCLUIDO';
-            // DISPUTAS_O_TRABAS: Reclamo, Disputa, Error
             if (s.includes('RECLAMO') || s.includes('DISPUTA') || s.includes('ERROR') || s.includes('PROBLEMA') || s.includes('DEVUELT')) return 'DISPUTAS_O_TRABAS';
-            
             const isExplicitSuccess = s.includes('YA PAGO') || s.includes('PAGADO') || s.includes('COBRADA') || s.includes('COBRADO') || s.includes('ABONADO') || s.includes('CERRAD');
             if (isExplicitSuccess) return 'COBRADAS'; 
-            
             if (s.includes('FACTURA') || s.includes('FC') || s.includes('ENVIAD') || s.includes('ADMIN') || s.includes('NOTA DE') || s.includes('PENDIENTE') || s.includes('ESPERA') || s.includes('PAGO') || s.includes('A PAGAR')) return 'PENDIENTES_PAGO'; 
-            
             return 'CONTACTADO'; 
         }
 
@@ -477,7 +470,7 @@
                 case 'DICIEMBRE': 
                 case 'DIC': 
                 case '12': return 12;
-                default: return 99; // Coloca los meses múltiples al final
+                default: return 99; 
             }
         }
 
@@ -491,23 +484,21 @@
             });
             
             const monthArray = Array.from(months).map(m => {
-                // Heurística para detectar meses combinados (como "ENERO-ABRIL" o "ENERO Y ABRIL")
                 const isMultiMonth = m.includes('-') || m.includes('Y') || m.includes('/');
                 let sortValue = getMonthValue(m);
 
-                // Si es multi-mes, o no tiene un nombre de mes claro, forzamos al final (valor 99)
-                if (isMultiMonth || sortValue === 99) {
+                // MODIFICACIÓN V3.40: SOLO FORZAR AL FINAL SI NO TIENE UN VALOR DE MES VÁLIDO
+                if (sortValue === 99 && isMultiMonth) {
                     sortValue = 99;
                 } 
+                // Si sortValue es 5 (MAYO), se queda como 5, aunque tenga una "Y"
 
                 return { name: m, sortValue: sortValue };
             });
 
             monthArray.sort((a, b) => {
-                // Ordenar por valor numérico (1, 2, 3...)
                 if (a.sortValue < b.sortValue) return -1;
                 if (a.sortValue > b.sortValue) return 1;
-                // Si tienen el mismo valor (ej. ambos son 99, o ambos 4), ordenar alfabéticamente
                 return a.name.localeCompare(b.name);
             });
 
@@ -560,7 +551,7 @@
             let cobradas = 0;
             let stagnantTotal = 0;
             let bajasTotal = 0;
-            let bonificadasTotal = 0; // NUEVO CONTADOR PARA BONIFICADAS
+            let bonificadasTotal = 0; 
             
             const categoryCounts = { 'DISPUTAS_O_TRABAS': 0, 'PENDIENTES_PAGO': 0, 'CONTACTADO': 0, 'COBRADAS': 0, 'EXCLUIDO': 0 };
             const stagnantGroups = { 'DISPUTAS_O_TRABAS': [], 'PENDIENTES_PAGO': [], 'CONTACTADO': [] };
@@ -582,12 +573,10 @@
                 const category = categorizeStatus(statusRaw);
                 categoryCounts[category] = (categoryCounts[category] || 0) + 1;
 
-                // CONTADOR ESPECÍFICO PARA BONIFICADAS
                 if (statusRaw.toUpperCase().includes('BONIFICADA')) {
                     bonificadasTotal++;
                 }
 
-                // KPI EXCLUIDOS (Solo Bajas Reales: Suspendido/No se cobra/Bonificada)
                 if (category === 'EXCLUIDO') {
                     bajasTotal++;
                 }
@@ -609,11 +598,9 @@
                     cobradas++;
                     collectorStats[collector].cobrada++;
                 } else if (category !== 'EXCLUIDO') {
-                    // Pendientes: suma trabajo activo (Incluyendo Disputas)
                     collectorStats[collector].pending++;
                 }
 
-                // Cálculo de Alertas
                 if (category !== 'EXCLUIDO' && category !== 'COBRADAS') {
                     if (daysDiff > 3 || daysDiff === 999) {
                         stagnantTotal++;
@@ -634,18 +621,16 @@
             globalTotalSinBajas = total - bajasTotal; 
             const finalAdjustedTotal = globalTotalSinBajas;
 
-            // ACTUALIZACION CLAVE: kpiTotal ahora muestra CASOS ACTIVOS
             document.getElementById('kpiTotal').textContent = finalAdjustedTotal; 
             document.getElementById('kpiStagnant').textContent = stagnantTotal;
             document.getElementById('kpiBajas').textContent = bajasTotal;
-            document.getElementById('kpiBonificadas').textContent = bonificadasTotal; // NUEVO KPI
+            document.getElementById('kpiBonificadas').textContent = bonificadasTotal; 
             
 
             const conversionRate = finalAdjustedTotal > 0 ? Math.round((cobradas / finalAdjustedTotal) * 100) : 0;
             document.getElementById('kpiCollected').textContent = cobradas;
             document.getElementById('kpiEfficiencyNet').textContent = conversionRate + '%';
 
-            // Totales para la fila de resumen
             const grandTotalAssigned = total;
             const grandTotalCobradas = cobradas;
             const grandTotalPendientes = finalAdjustedTotal - cobradas; 
@@ -658,8 +643,6 @@
             renderStagnantGroup('list-facturas', 'count-facturas', stagnantGroups['PENDIENTES_PAGO'], 'bg-white border-l-4 border-blue-500');
             renderStagnantGroup('list-contactos', 'count-contactos', stagnantGroups['CONTACTADO'], 'bg-white border-l-4 border-yellow-500');
         }
-
-        // --- RENDERING FUNCTIONS ---
 
         function renderCollectorsTable(stats, grandTotalAssigned, grandTotalCobradas, grandTotalPendientes, grandTotalAlerta) {
             const tbody = document.getElementById('collectorsTableBody');

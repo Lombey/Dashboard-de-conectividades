@@ -30,7 +30,7 @@
             </div>
             <div class="text-sm opacity-80 flex items-center gap-2">
                 <span id="currentDateDisplay"></span> 
-                <span>| Panel v3.21</span>
+                <span>| Panel v3.22</span>
             </div>
         </div>
     </nav>
@@ -99,7 +99,7 @@
             <div class="bg-white p-4 rounded-lg shadow border-l-4 border-orange-500 card">
                 <div class="text-slate-500 text-sm font-semibold uppercase">Bajas (Excluidos)</div>
                 <div class="text-3xl font-bold mt-1" id="kpiBajas">0</div>
-                <div class="text-xs text-slate-400 mt-1">Suspendidas/No se cobra</div> <!-- AQUI EL CAMBIO -->
+                <div class="text-xs text-slate-400 mt-1">Suspendidas/No se cobra</div> 
             </div>
             
             <div class="bg-white p-4 rounded-lg shadow border-l-4 border-red-500 card">
@@ -115,7 +115,8 @@
             <!-- Status Chart -->
             <div class="bg-white p-6 rounded-lg shadow flex flex-col items-center">
                 <h3 class="font-bold text-slate-700 mb-4 w-full text-left">Distribución Activa <span class="text-xs text-slate-500 font-normal">(Sin Reclamos/Bajas)</span></h3>
-                <div class="h-80 w-full max-w-2xl flex items-center justify-center">
+                <!-- Contenedor ajustado para barra horizontal -->
+                <div class="h-20 w-full max-w-4xl flex items-center justify-center">
                     <canvas id="statusChart"></canvas>
                 </div>
             </div>
@@ -632,32 +633,66 @@
                 return;
             }
 
-            const percentageLabels = data.map((value, index) => {
-                const percent = totalForChart > 0 ? Math.round((value / totalForChart) * 100) : 0;
-                return `${displayLabels[index]} (${percent}%)`;
-            });
-            
+            // Para la barra horizontal, el gráfico debe apilar los datos
+            const datasets = [
+                {
+                    label: displayLabels[0],
+                    data: [data[0]],
+                    backgroundColor: ['#3b82f6'], // Azul
+                    stack: 'Stack 0',
+                },
+                {
+                    label: displayLabels[1],
+                    data: [data[1]],
+                    backgroundColor: ['#eab308'], // Amarillo
+                    stack: 'Stack 0',
+                },
+                {
+                    label: displayLabels[2],
+                    data: [data[2]],
+                    backgroundColor: ['#22c55e'], // Verde
+                    stack: 'Stack 0',
+                },
+            ];
+
+
             statusChartInstance = new Chart(ctx, {
-                type: 'doughnut',
+                type: 'bar', // Cambiado a barra
                 data: {
-                    labels: percentageLabels,
-                    datasets: [{
-                        data: data,
-                        backgroundColor: ['#3b82f6', '#eab308', '#22c55e'],
-                        borderWidth: 0
-                    }]
+                    labels: ['Distribución'], // Una sola etiqueta para la barra
+                    datasets: datasets,
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    indexAxis: 'y', // Hace la barra horizontal
+                    scales: {
+                        x: {
+                            stacked: true,
+                            display: false, // Ocultar el eje X para mantener un look limpio
+                            max: totalForChart,
+                        },
+                        y: {
+                            stacked: true,
+                            display: false, // Ocultar el eje Y
+                        }
+                    },
                     plugins: { 
-                        legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } },
+                        legend: { 
+                            position: 'bottom', 
+                            labels: { 
+                                boxWidth: 10, 
+                                font: { size: 11 } 
+                            } 
+                        },
                         datalabels: {
                             color: '#fff',
                             font: { weight: 'bold', size: 12 },
-                            formatter: (value) => {
+                            formatter: (value, context) => {
                                 const percent = (value * 100 / totalForChart).toFixed(0);
-                                return percent + "%";
+                                const label = context.dataset.label.split(' ')[0]; // Solo el nombre corto (PENDIENTES, CONTACTADO, COBRADAS)
+                                if (value === 0) return '';
+                                return `${label}: ${percent}%`;
                             }
                         }
                     }

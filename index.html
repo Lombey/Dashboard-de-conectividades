@@ -7,6 +7,12 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Plugin para etiquetas de datos en Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <!-- Librerías para Exportar a PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
@@ -15,7 +21,7 @@
 </head>
 <body class="bg-slate-50 text-slate-800">
 
-    <!-- Navbar -->
+    <!-- Navbar (Oculta en PDF) -->
     <nav class="bg-blue-900 text-white p-4 shadow-lg">
         <div class="container mx-auto flex justify-between items-center">
             <div class="flex items-center gap-3">
@@ -24,19 +30,19 @@
             </div>
             <div class="text-sm opacity-80 flex items-center gap-2">
                 <span id="currentDateDisplay"></span> 
-                <span>| Panel v3.10</span>
+                <span>| Panel v3.21</span>
             </div>
         </div>
     </nav>
 
-    <div class="container mx-auto p-4 md:p-6 space-y-6">
+    <div class="container mx-auto p-4 md:p-6 space-y-6" id="dashboardContainer">
 
-        <!-- Controls Area (Compact & Manual) -->
-        <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+        <!-- Controls Area (SE OCULTARÁ EN EL PDF) -->
+        <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200" id="controlsSection">
             <div class="flex flex-col md:flex-row gap-4 items-end justify-between">
                 
                 <!-- Data Source Config -->
-                <div class="w-full md:w-1/2">
+                <div class="w-full md:w-1/2" id="dataSourceConfig">
                     <label class="block text-xs font-medium text-slate-400 mb-1">Origen de Datos (Google Sheets)</label>
                     <div class="flex gap-2">
                         <input type="text" id="sheetUrlInput" 
@@ -50,12 +56,23 @@
                     </div>
                 </div>
 
-                <!-- Filter -->
-                <div class="w-full md:w-1/3">
-                    <label class="block text-sm font-bold text-slate-700 mb-1">Filtrar por Mes de Vencimiento</label>
-                    <select id="monthFilter" class="w-full border-blue-300 rounded-md shadow-sm p-2 border-2 focus:ring-blue-500 focus:border-blue-500 bg-blue-50 text-blue-900 font-semibold disabled:opacity-50" disabled>
-                        <option value="TODOS">Esperando datos...</option>
-                    </select>
+                <!-- Filter & PDF Button Container -->
+                <div class="w-full md:w-1/2 flex gap-4 items-end justify-end">
+                    <!-- Filter -->
+                    <div class="w-1/2">
+                        <label class="block text-sm font-bold text-slate-700 mb-1">Filtrar por Mes de Vencimiento</label>
+                        <select id="monthFilter" class="w-full border-blue-300 rounded-md shadow-sm p-2 border-2 focus:ring-blue-500 focus:border-blue-500 bg-blue-50 text-blue-900 font-semibold disabled:opacity-50" disabled>
+                            <option value="TODOS">Esperando datos...</option>
+                        </select>
+                    </div>
+
+                    <!-- PDF Button -->
+                    <div class="w-1/4">
+                        <button id="downloadPdfBtn" class="w-full bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-2 px-4 rounded transition shadow-md disabled:opacity-50 flex items-center justify-center gap-2" disabled>
+                            <i class="fa-solid fa-file-pdf"></i> 
+                            <span id="pdfBtnText">PDF</span> 
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -63,7 +80,7 @@
         <!-- KPI Cards -->
         <div id="kpiSection" class="hidden grid grid-cols-1 md:grid-cols-5 gap-4">
             <div class="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500 card">
-                <div class="text-slate-500 text-sm font-semibold uppercase">Total Casos</div>
+                <div class="text-slate-500 text-sm font-semibold uppercase">Conectividades</div>
                 <div class="text-3xl font-bold mt-1" id="kpiTotal">0</div>
             </div>
             
@@ -82,7 +99,7 @@
             <div class="bg-white p-4 rounded-lg shadow border-l-4 border-orange-500 card">
                 <div class="text-slate-500 text-sm font-semibold uppercase">Bajas (Excluidos)</div>
                 <div class="text-3xl font-bold mt-1" id="kpiBajas">0</div>
-                <div class="text-xs text-slate-400 mt-1">Susp. / No Cobra</div>
+                <div class="text-xs text-slate-400 mt-1">Suspendidas/No se cobra</div> <!-- AQUI EL CAMBIO -->
             </div>
             
             <div class="bg-white p-4 rounded-lg shadow border-l-4 border-red-500 card">
@@ -112,7 +129,9 @@
                             <th class="px-6 py-3">Responsable</th>
                             <th class="px-6 py-3">Total Asignado</th>
                             <th class="px-6 py-3 text-green-700">Cobradas</th>
-                            <th class="px-6 py-3 text-yellow-600">Pendientes</th> <!-- Suma de todo lo activo no cobrado -->
+                            <th class="px-6 py-3 text-yellow-600">Pendientes</th>
+                            <!-- Nueva Columna de Efectividad -->
+                            <th class="px-6 py-3 text-blue-700 font-bold">Efectividad Cobro</th>
                             <th class="px-6 py-3 text-red-600">Alerta (+3 días)</th>
                             <th class="px-6 py-3">Última Gestión</th>
                         </tr>
@@ -145,6 +164,12 @@
     </div>
 
     <script>
+        // Register ChartDataLabels plugin explicitly
+        Chart.register(ChartDataLabels);
+
+        // Alias para jspdf
+        const { jsPDF } = window.jspdf;
+
         let rawData = [];
         let statusChartInstance = null;
 
@@ -155,6 +180,114 @@
 
         document.getElementById('importBtn').addEventListener('click', loadDataFromSheet);
         document.getElementById('monthFilter').addEventListener('change', runDashboard);
+        document.getElementById('downloadPdfBtn').addEventListener('click', generatePDF);
+
+
+        // --- PDF GENERATION ---
+        async function generatePDF() {
+            const pdfBtn = document.getElementById('downloadPdfBtn');
+            const pdfBtnText = document.getElementById('pdfBtnText');
+            const container = document.getElementById('dashboardContainer'); 
+            const controlsSection = document.getElementById('controlsSection'); 
+            
+            // 1. UI state
+            pdfBtn.disabled = true;
+            pdfBtnText.textContent = "Generando...";
+
+            // 2. Ocultar elementos que NO deben ir en el PDF
+            const navbar = document.querySelector('nav');
+            navbar.style.display = 'none';
+            controlsSection.style.display = 'none'; // OCULTA TODO EL RECUADRO DE INPUTS/FILTROS
+            
+            // 3. Get current state info para el header fijo
+            const reportDate = document.getElementById('currentDateDisplay').textContent;
+            const selectedMonth = document.getElementById('monthFilter').options[document.getElementById('monthFilter').selectedIndex].text;
+            
+            // 4. Capturar el contenido principal
+            const canvas = await html2canvas(container, {
+                scale: 2, 
+                allowTaint: true,
+                useCORS: true,
+            });
+            
+            // 5. Restaurar elementos ocultos
+            navbar.style.display = 'block';
+            controlsSection.style.display = 'block'; 
+
+            // 6. Crear PDF
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+            const margin = 10;
+            const headerOffset = 30; // Espacio reservado para el header
+
+            // 7. Add Header/Title
+            pdf.setFontSize(18);
+            pdf.setFont('inter', 'bold');
+            pdf.setTextColor(25, 25, 112); 
+            pdf.text("REPORTE DE COBRANZAS (ISO 9001)", margin, 15);
+            
+            pdf.setFontSize(12);
+            pdf.setFont('inter', 'normal');
+            pdf.setTextColor(50, 50, 50);
+            pdf.text(`${reportDate} | Mes Seleccionado: ${selectedMonth}`, margin, 22);
+
+            // 8. Add Captured Image (Content)
+            const imgData = canvas.toDataURL('image/jpeg', 0.9);
+            const imgProps = pdf.getImageProperties(imgData);
+            
+            const contentWidth = pdfWidth - 2 * margin; 
+            const contentHeight = (imgProps.height * contentWidth) / imgProps.width; 
+            
+            let currentY = headerOffset; 
+
+            // Lógica de ajuste a una página si es posible
+            if (contentHeight <= pdfHeight - headerOffset - margin) {
+                 pdf.addImage(imgData, 'JPEG', margin, currentY, contentWidth, contentHeight);
+            } else {
+                // Si no cabe, intentamos escalar un poco
+                const overflowRatio = contentHeight / (pdfHeight - headerOffset - margin);
+                if (overflowRatio < 1.2) { 
+                     pdf.addImage(imgData, 'JPEG', margin, currentY, contentWidth, pdfHeight - headerOffset - margin);
+                } else {
+                    let position = 0;
+                    while (position < contentHeight) {
+                        if (position > 0) {
+                            pdf.addPage();
+                            currentY = margin; 
+                        }
+                        
+                        const remainingHeight = contentHeight - position;
+                        const heightToDraw = Math.min(remainingHeight, pdfHeight - currentY - margin);
+                        
+                        const sliceY_canvas = position * (canvas.height / contentHeight);
+                        const sliceHeight_canvas = heightToDraw * (canvas.height / contentHeight);
+                        
+                        const tempCanvas = document.createElement('canvas');
+                        tempCanvas.width = canvas.width;
+                        tempCanvas.height = sliceHeight_canvas;
+                        const ctx = tempCanvas.getContext('2d');
+                        
+                        ctx.drawImage(canvas, 0, sliceY_canvas, canvas.width, sliceHeight_canvas, 0, 0, tempCanvas.width, tempCanvas.height);
+                        
+                        pdf.addImage(tempCanvas.toDataURL('image/jpeg', 0.9), 'JPEG', margin, currentY, contentWidth, heightToDraw);
+
+                        position += heightToDraw;
+                    }
+                }
+            }
+            
+            // 9. Save PDF
+            const month = document.getElementById('monthFilter').value;
+            const today = new Date().toISOString().slice(0, 10);
+            pdf.save(`Reporte_Cobranzas_${month}_${today}.pdf`);
+
+            // 10. Cleanup
+            pdfBtn.disabled = false;
+            pdfBtnText.textContent = "PDF"; 
+        }
+
 
         // --- DATA LOADING ---
         async function loadDataFromSheet() {
@@ -162,10 +295,15 @@
             const btn = document.getElementById('importBtn');
             const btnText = document.getElementById('btnText');
             const filterSelect = document.getElementById('monthFilter');
+            const pdfBtn = document.getElementById('downloadPdfBtn');
             
             btn.disabled = true;
+            pdfBtn.disabled = true;
             btn.classList.add('opacity-75', 'cursor-wait');
             btnText.textContent = "Cargando...";
+            
+            document.getElementById('kpiSection').classList.add('hidden');
+            document.getElementById('dashboardContent').classList.add('hidden');
 
             if (!urlInput) {
                 alert("No hay enlace de hoja configurado.");
@@ -193,7 +331,7 @@
                     await fetchAndParse(proxyUrl);
                     finishLoading();
                 } catch (error2) {
-                    console.error(error2);
+                    console.error("Fallo definitivo en la carga:", error2);
                     alert("No se pudo conectar. Verifica que la hoja sea pública o tenga el enlace compartido correctamente.");
                     resetBtn();
                 }
@@ -201,17 +339,25 @@
 
             function resetBtn() {
                 btn.disabled = false;
+                pdfBtn.disabled = true;
                 btn.classList.remove('opacity-75', 'cursor-wait');
+                btn.classList.remove('bg-green-600', 'hover:bg-green-700');
+                btn.classList.add('bg-blue-600', 'hover:bg-blue-700');
                 btnText.textContent = "Importar Datos";
+                filterSelect.disabled = true;
+                filterSelect.innerHTML = '<option value="TODOS">Esperando datos...</option>';
             }
 
             function finishLoading() {
                 btn.disabled = false;
+                pdfBtn.disabled = false;
                 btn.classList.remove('opacity-75', 'cursor-wait');
                 btn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
                 btn.classList.add('bg-green-600', 'hover:bg-green-700');
                 btnText.textContent = "Datos Actualizados";
                 filterSelect.disabled = false;
+                document.getElementById('kpiSection').classList.remove('hidden');
+                document.getElementById('dashboardContent').classList.remove('hidden');
                 setTimeout(() => {
                     btn.classList.remove('bg-green-600', 'hover:bg-green-700');
                     btn.classList.add('bg-blue-600', 'hover:bg-blue-700');
@@ -255,15 +401,13 @@
             if (totalRowsRead > 1) {
                 rawData = results.data.slice(1);
                 populateMonthFilter();
-                document.getElementById('kpiSection').classList.remove('hidden');
-                document.getElementById('dashboardContent').classList.remove('hidden');
                 runDashboard();
             } else {
                 throw new Error("Datos insuficientes.");
             }
         }
 
-        // --- LOGIC ---
+        // --- CORE CALCULATIONS ---
         function categorizeStatus(statusRaw) {
             const s = (statusRaw || '').toUpperCase();
             if (s.includes('NO SE COBRA') || s.includes('SUSPENDIDO') || s.includes('BONIFICADA') || s.includes('EXCLUIDO')) return 'EXCLUIDO';
@@ -319,9 +463,9 @@
         }
 
         function runDashboard() {
-            const QUIEN_COBRA_INDEX = 13;
-            const ESTADO_INDEX = 14;
-            const FECHA_CAMBIO_INDEX = 15;
+            const QUIEN_COBRA_INDEX = 13; 
+            const ESTADO_INDEX = 14;     
+            const FECHA_CAMBIO_INDEX = 15; 
 
             const selectedMonth = document.getElementById('monthFilter').value;
 
@@ -332,12 +476,11 @@
             
             const categoryCounts = { 'RECLAMOS': 0, 'PENDIENTES_PAGO': 0, 'CONTACTADO': 0, 'COBRADAS': 0, 'EXCLUIDO': 0 };
             const stagnantGroups = { 'RECLAMOS': [], 'PENDIENTES_PAGO': [], 'CONTACTADO': [] };
-            
-            // Initialize pending property
             const collectorStats = {};
             
             rawData.forEach(row => {
-                if (row.length < 10) return; 
+                if (row.length < 16) return; 
+                
                 const rowMonth = (row[8] || '').trim().toUpperCase();
                 if (selectedMonth !== 'TODOS' && rowMonth !== selectedMonth) return;
 
@@ -370,12 +513,10 @@
                     cobradas++;
                     collectorStats[collector].cobrada++;
                 } else if (category !== 'EXCLUIDO') {
-                    // Nueva Lógica: Pendientes incluye Todo lo que NO es Cobrado NI Excluido
-                    // Esto abarca: CONTACTADO, PENDIENTES_PAGO y RECLAMOS
                     collectorStats[collector].pending++;
                 }
 
-                if (category !== 'EXCLUIDO') {
+                if (category !== 'EXCLUIDO' && category !== 'COBRADAS') {
                     if (daysDiff > 3 || daysDiff === 999) {
                         stagnantTotal++;
                         collectorStats[collector].stagnant++;
@@ -409,6 +550,8 @@
             renderStagnantGroup('list-contactos', 'count-contactos', stagnantGroups['CONTACTADO'], 'bg-white border-l-4 border-yellow-500');
         }
 
+        // --- RENDERING FUNCTIONS ---
+
         function renderCollectorsTable(stats) {
             const tbody = document.getElementById('collectorsTableBody');
             tbody.innerHTML = '';
@@ -420,11 +563,20 @@
                 const tr = document.createElement('tr');
                 tr.className = "bg-white border-b hover:bg-slate-50";
                 const lastInteraction = stat.lastDate ? stat.lastDate.toLocaleDateString('es-AR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-';
+                
+                // Cálculo de efectividad: Cobradas / (Pendientes + Cobradas)
+                const activeTotal = stat.pending + stat.cobrada;
+                let effectiveness = 0;
+                if (activeTotal > 0) {
+                    effectiveness = Math.round((stat.cobrada / activeTotal) * 100);
+                }
+
                 tr.innerHTML = `
                     <td class="px-6 py-4 font-medium text-slate-900">${stat.name}</td>
                     <td class="px-6 py-4">${stat.total}</td>
                     <td class="px-6 py-4 text-green-600 font-bold">${stat.cobrada}</td>
                     <td class="px-6 py-4 text-yellow-600 font-bold">${stat.pending}</td>
+                    <td class="px-6 py-4 text-blue-700 font-bold">${stat.cobrada} / ${activeTotal} (${effectiveness}%)</td>
                     <td class="px-6 py-4 text-red-600 font-bold">${stat.stagnant}</td>
                     <td class="px-6 py-4 text-slate-500 text-xs">${lastInteraction}</td>
                 `;
@@ -470,6 +622,16 @@
             let totalForChart = 0;
             internalLabels.forEach(key => totalForChart += (dataObj[key] || 0));
             const data = internalLabels.map(key => dataObj[key] || 0);
+            
+            if (totalForChart === 0) {
+                ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                ctx.font = '16px Inter';
+                ctx.fillStyle = '#94a3b8';
+                ctx.textAlign = 'center';
+                ctx.fillText('No hay datos para el mes seleccionado.', ctx.canvas.width / 2, ctx.canvas.height / 2);
+                return;
+            }
+
             const percentageLabels = data.map((value, index) => {
                 const percent = totalForChart > 0 ? Math.round((value / totalForChart) * 100) : 0;
                 return `${displayLabels[index]} (${percent}%)`;
@@ -488,7 +650,17 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } }
+                    plugins: { 
+                        legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } },
+                        datalabels: {
+                            color: '#fff',
+                            font: { weight: 'bold', size: 12 },
+                            formatter: (value) => {
+                                const percent = (value * 100 / totalForChart).toFixed(0);
+                                return percent + "%";
+                            }
+                        }
+                    }
                 }
             });
         }

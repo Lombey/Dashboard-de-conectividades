@@ -30,7 +30,7 @@
             </div>
             <div class="text-sm opacity-80 flex items-center gap-2">
                 <span id="currentDateDisplay"></span> 
-                <span>| Panel v3.22</span>
+                <span>| Panel v3.30</span>
             </div>
         </div>
     </nav>
@@ -97,7 +97,7 @@
             </div>
             
             <div class="bg-white p-4 rounded-lg shadow border-l-4 border-orange-500 card">
-                <div class="text-slate-500 text-sm font-semibold uppercase">Bajas (Excluidos)</div>
+                <div class="text-slate-500 text-sm font-semibold uppercase">CASOS EXCLUIDOS</div>
                 <div class="text-3xl font-bold mt-1" id="kpiBajas">0</div>
                 <div class="text-xs text-slate-400 mt-1">Suspendidas/No se cobra</div> 
             </div>
@@ -114,7 +114,7 @@
             
             <!-- Status Chart -->
             <div class="bg-white p-6 rounded-lg shadow flex flex-col items-center">
-                <h3 class="font-bold text-slate-700 mb-4 w-full text-left">Distribución Activa <span class="text-xs text-slate-500 font-normal">(Sin Reclamos/Bajas)</span></h3>
+                <h3 class="font-bold text-slate-700 mb-4 w-full text-left">Distribución de Cobranzas</h3> 
                 <!-- Contenedor ajustado para barra horizontal -->
                 <div class="h-20 w-full max-w-4xl flex items-center justify-center">
                     <canvas id="statusChart"></canvas>
@@ -148,7 +148,7 @@
                 </h3>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div class="bg-red-50 rounded-lg p-3 border border-red-100">
-                        <h4 class="font-bold text-red-800 mb-3 flex justify-between"><span><i class="fa-solid fa-triangle-exclamation mr-2"></i>RECLAMOS</span><span class="bg-red-200 text-red-800 text-xs px-2 py-1 rounded-full" id="count-reclamos">0</span></h4>
+                        <h4 class="font-bold text-red-800 mb-3 flex justify-between"><span><i class="fa-solid fa-triangle-exclamation mr-2"></i>DISPUTAS/ERRORES</span><span class="bg-red-200 text-red-800 text-xs px-2 py-1 rounded-full" id="count-reclamos">0</span></h4>
                         <div class="overflow-y-auto max-h-80 space-y-2" id="list-reclamos"></div>
                     </div>
                     <div class="bg-blue-50 rounded-lg p-3 border border-blue-100">
@@ -173,6 +173,7 @@
 
         let rawData = [];
         let statusChartInstance = null;
+        let globalTotalSinBajas = 0; 
 
         document.addEventListener('DOMContentLoaded', () => {
             const today = new Date();
@@ -198,7 +199,7 @@
             // 2. Ocultar elementos que NO deben ir en el PDF
             const navbar = document.querySelector('nav');
             navbar.style.display = 'none';
-            controlsSection.style.display = 'none'; // OCULTA TODO EL RECUADRO DE INPUTS/FILTROS
+            controlsSection.style.display = 'none'; 
             
             // 3. Get current state info para el header fijo
             const reportDate = document.getElementById('currentDateDisplay').textContent;
@@ -221,7 +222,7 @@
             const pdfWidth = pdf.internal.pageSize.getWidth();
             const pdfHeight = pdf.internal.pageSize.getHeight();
             const margin = 10;
-            const headerOffset = 30; // Espacio reservado para el header
+            const headerOffset = 30; 
 
             // 7. Add Header/Title
             pdf.setFontSize(18);
@@ -243,11 +244,10 @@
             
             let currentY = headerOffset; 
 
-            // Lógica de ajuste a una página si es posible
+            // Lógica de ajuste a una página
             if (contentHeight <= pdfHeight - headerOffset - margin) {
                  pdf.addImage(imgData, 'JPEG', margin, currentY, contentWidth, contentHeight);
             } else {
-                // Si no cabe, intentamos escalar un poco
                 const overflowRatio = contentHeight / (pdfHeight - headerOffset - margin);
                 if (overflowRatio < 1.2) { 
                      pdf.addImage(imgData, 'JPEG', margin, currentY, contentWidth, pdfHeight - headerOffset - margin);
@@ -279,12 +279,10 @@
                 }
             }
             
-            // 9. Save PDF
             const month = document.getElementById('monthFilter').value;
             const today = new Date().toISOString().slice(0, 10);
             pdf.save(`Reporte_Cobranzas_${month}_${today}.pdf`);
 
-            // 10. Cleanup
             pdfBtn.disabled = false;
             pdfBtnText.textContent = "PDF"; 
         }
@@ -411,11 +409,16 @@
         // --- CORE CALCULATIONS ---
         function categorizeStatus(statusRaw) {
             const s = (statusRaw || '').toUpperCase();
+            // EXCLUIDO: Bonificada, Suspendida, No se cobra
             if (s.includes('NO SE COBRA') || s.includes('SUSPENDIDO') || s.includes('BONIFICADA') || s.includes('EXCLUIDO')) return 'EXCLUIDO';
-            if (s.includes('RECLAMO') || s.includes('DISPUTA') || s.includes('ERROR') || s.includes('PROBLEMA') || s.includes('DEVUELT')) return 'RECLAMOS';
+            // DISPUTAS_O_TRABAS: Reclamo, Disputa, Error
+            if (s.includes('RECLAMO') || s.includes('DISPUTA') || s.includes('ERROR') || s.includes('PROBLEMA') || s.includes('DEVUELT')) return 'DISPUTAS_O_TRABAS';
+            
             const isExplicitSuccess = s.includes('YA PAGO') || s.includes('PAGADO') || s.includes('COBRADA') || s.includes('COBRADO') || s.includes('ABONADO') || s.includes('CERRAD');
             if (isExplicitSuccess) return 'COBRADAS'; 
+            
             if (s.includes('FACTURA') || s.includes('FC') || s.includes('ENVIAD') || s.includes('ADMIN') || s.includes('NOTA DE') || s.includes('PENDIENTE') || s.includes('ESPERA') || s.includes('PAGO') || s.includes('A PAGAR')) return 'PENDIENTES_PAGO'; 
+            
             return 'CONTACTADO'; 
         }
 
@@ -475,8 +478,8 @@
             let stagnantTotal = 0;
             let bajasTotal = 0;
             
-            const categoryCounts = { 'RECLAMOS': 0, 'PENDIENTES_PAGO': 0, 'CONTACTADO': 0, 'COBRADAS': 0, 'EXCLUIDO': 0 };
-            const stagnantGroups = { 'RECLAMOS': [], 'PENDIENTES_PAGO': [], 'CONTACTADO': [] };
+            const categoryCounts = { 'DISPUTAS_O_TRABAS': 0, 'PENDIENTES_PAGO': 0, 'CONTACTADO': 0, 'COBRADAS': 0, 'EXCLUIDO': 0 };
+            const stagnantGroups = { 'DISPUTAS_O_TRABAS': [], 'PENDIENTES_PAGO': [], 'CONTACTADO': [] };
             const collectorStats = {};
             
             rawData.forEach(row => {
@@ -495,7 +498,10 @@
                 const category = categorizeStatus(statusRaw);
                 categoryCounts[category] = (categoryCounts[category] || 0) + 1;
 
-                if (category === 'EXCLUIDO') bajasTotal++;
+                // CORRECCIÓN: KPI EXCLUIDOS SOLO CUENTA BAJAS REALES (Suspendido/Bonificada)
+                if (category === 'EXCLUIDO') {
+                    bajasTotal++;
+                }
 
                 if (!collectorStats[collector]) collectorStats[collector] = { name: collector, total: 0, cobrada: 0, pending: 0, stagnant: 0, lastDate: null };
                 
@@ -514,9 +520,11 @@
                     cobradas++;
                     collectorStats[collector].cobrada++;
                 } else if (category !== 'EXCLUIDO') {
+                    // Pendientes: suma trabajo activo (Incluyendo Disputas que requieren gestión)
                     collectorStats[collector].pending++;
                 }
 
+                // Cálculo de Alertas
                 if (category !== 'EXCLUIDO' && category !== 'COBRADAS') {
                     if (daysDiff > 3 || daysDiff === 999) {
                         stagnantTotal++;
@@ -534,7 +542,8 @@
                 }
             });
 
-            const finalAdjustedTotal = total - bajasTotal;
+            globalTotalSinBajas = total - bajasTotal; 
+            const finalAdjustedTotal = globalTotalSinBajas;
 
             document.getElementById('kpiTotal').textContent = total;
             document.getElementById('kpiStagnant').textContent = stagnantTotal;
@@ -544,18 +553,26 @@
             document.getElementById('kpiCollected').textContent = cobradas;
             document.getElementById('kpiEfficiencyNet').textContent = conversionRate + '%';
 
-            updateStatusChart(categoryCounts);
-            renderCollectorsTable(collectorStats);
-            renderStagnantGroup('list-reclamos', 'count-reclamos', stagnantGroups['RECLAMOS'], 'bg-white border-l-4 border-red-500');
+            // Totales para la fila de resumen
+            const grandTotalAssigned = total;
+            const grandTotalCobradas = cobradas;
+            const grandTotalPendientes = finalAdjustedTotal - cobradas; 
+            const grandTotalAlerta = stagnantTotal;
+
+
+            updateStatusChart(categoryCounts, finalAdjustedTotal); 
+            renderCollectorsTable(collectorStats, grandTotalAssigned, grandTotalCobradas, grandTotalPendientes, grandTotalAlerta);
+            renderStagnantGroup('list-reclamos', 'count-reclamos', stagnantGroups['DISPUTAS_O_TRABAS'], 'bg-white border-l-4 border-red-500');
             renderStagnantGroup('list-facturas', 'count-facturas', stagnantGroups['PENDIENTES_PAGO'], 'bg-white border-l-4 border-blue-500');
             renderStagnantGroup('list-contactos', 'count-contactos', stagnantGroups['CONTACTADO'], 'bg-white border-l-4 border-yellow-500');
         }
 
         // --- RENDERING FUNCTIONS ---
 
-        function renderCollectorsTable(stats) {
+        function renderCollectorsTable(stats, grandTotalAssigned, grandTotalCobradas, grandTotalPendientes, grandTotalAlerta) {
             const tbody = document.getElementById('collectorsTableBody');
             tbody.innerHTML = '';
+            
             const sortedStats = Object.values(stats)
                 .filter(stat => stat.total > 0 || stat.name !== 'SIN ASIGNAR')
                 .sort((a, b) => b.total - a.total);
@@ -565,7 +582,6 @@
                 tr.className = "bg-white border-b hover:bg-slate-50";
                 const lastInteraction = stat.lastDate ? stat.lastDate.toLocaleDateString('es-AR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-';
                 
-                // Cálculo de efectividad: Cobradas / (Pendientes + Cobradas)
                 const activeTotal = stat.pending + stat.cobrada;
                 let effectiveness = 0;
                 if (activeTotal > 0) {
@@ -583,6 +599,22 @@
                 `;
                 tbody.appendChild(tr);
             });
+
+            const trTotal = document.createElement('tr');
+            trTotal.className = "bg-slate-200 border-t-2 border-slate-500 font-extrabold text-slate-900";
+            const totalActiveRow = grandTotalCobradas + grandTotalPendientes;
+            const totalEffectivenessRow = totalActiveRow > 0 ? Math.round((grandTotalCobradas / totalActiveRow) * 100) : 0;
+
+            trTotal.innerHTML = `
+                <td class="px-6 py-4">TOTAL</td>
+                <td class="px-6 py-4">${grandTotalAssigned}</td>
+                <td class="px-6 py-4 text-green-700">${grandTotalCobradas}</td>
+                <td class="px-6 py-4 text-yellow-600">${grandTotalPendientes}</td>
+                <td class="px-6 py-4 text-blue-700">${grandTotalCobradas} / ${totalActiveRow} (${totalEffectivenessRow}%)</td>
+                <td class="px-6 py-4 text-red-600">${grandTotalAlerta}</td>
+                <td class="px-6 py-4">-</td>
+            `;
+            tbody.appendChild(trTotal);
         }
 
         function renderStagnantGroup(containerId, countId, items, cardClass) {
@@ -615,25 +647,26 @@
             });
         }
 
-        function updateStatusChart(dataObj) {
+        function updateStatusChart(dataObj, totalUniverse) { 
             const ctx = document.getElementById('statusChart').getContext('2d');
             if (statusChartInstance) statusChartInstance.destroy();
             const internalLabels = ['PENDIENTES_PAGO', 'CONTACTADO', 'COBRADAS'];
             const displayLabels = ['PENDIENTES DE PAGO', 'CONTACTADO', 'COBRADAS'];
-            let totalForChart = 0;
-            internalLabels.forEach(key => totalForChart += (dataObj[key] || 0));
+            
+            const totalForChart = (dataObj['PENDIENTES_PAGO'] || 0) + (dataObj['CONTACTADO'] || 0) + (dataObj['COBRADAS'] || 0);
+            const activeUniverse = totalUniverse;
+            
             const data = internalLabels.map(key => dataObj[key] || 0);
             
-            if (totalForChart === 0) {
+            if (activeUniverse === 0) {
                 ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
                 ctx.font = '16px Inter';
                 ctx.fillStyle = '#94a3b8';
                 ctx.textAlign = 'center';
-                ctx.fillText('No hay datos para el mes seleccionado.', ctx.canvas.width / 2, ctx.canvas.height / 2);
+                ctx.fillText('No hay datos activos para el mes seleccionado.', ctx.canvas.width / 2, ctx.canvas.height / 2);
                 return;
             }
 
-            // Para la barra horizontal, el gráfico debe apilar los datos
             const datasets = [
                 {
                     label: displayLabels[0],
@@ -655,26 +688,25 @@
                 },
             ];
 
-
             statusChartInstance = new Chart(ctx, {
-                type: 'bar', // Cambiado a barra
+                type: 'bar', 
                 data: {
-                    labels: ['Distribución'], // Una sola etiqueta para la barra
+                    labels: ['Distribución'], 
                     datasets: datasets,
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    indexAxis: 'y', // Hace la barra horizontal
+                    indexAxis: 'y', 
                     scales: {
                         x: {
                             stacked: true,
-                            display: false, // Ocultar el eje X para mantener un look limpio
-                            max: totalForChart,
+                            display: false, 
+                            max: activeUniverse, 
                         },
                         y: {
                             stacked: true,
-                            display: false, // Ocultar el eje Y
+                            display: false, 
                         }
                     },
                     plugins: { 
@@ -689,10 +721,12 @@
                             color: '#fff',
                             font: { weight: 'bold', size: 12 },
                             formatter: (value, context) => {
-                                const percent = (value * 100 / totalForChart).toFixed(0);
-                                const label = context.dataset.label.split(' ')[0]; // Solo el nombre corto (PENDIENTES, CONTACTADO, COBRADAS)
+                                const percent = (value * 100 / activeUniverse).toFixed(0); 
+                                let fullLabel = context.dataset.label; 
+                                if (fullLabel === 'PENDIENTES DE PAGO') fullLabel = 'PENDIENTES';
+                                
                                 if (value === 0) return '';
-                                return `${label}: ${percent}%`;
+                                return `${fullLabel}: ${percent}%`; 
                             }
                         }
                     }

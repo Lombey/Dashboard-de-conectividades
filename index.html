@@ -30,7 +30,7 @@
             </div>
             <div class="text-sm opacity-80 flex items-center gap-2">
                 <span id="currentDateDisplay"></span> 
-                <span>| Panel v3.37</span>
+                <span>| Panel v3.39</span>
             </div>
         </div>
     </nav>
@@ -441,18 +441,42 @@
         function getMonthValue(monthName) {
             const normalizedName = monthName.toUpperCase().replace(/\s/g, '');
             switch (normalizedName) {
-                case 'ENERO': return 1;
-                case 'FEBRERO': return 2;
-                case 'MARZO': return 3;
-                case 'ABRIL': return 4;
-                case 'MAYO': return 5;
-                case 'JUNIO': return 6;
-                case 'JULIO': return 7;
-                case 'AGOSTO': return 8;
-                case 'SEPTIEMBRE': return 9;
-                case 'OCTUBRE': return 10;
-                case 'NOVIEMBRE': return 11;
-                case 'DICIEMBRE': return 12;
+                case 'ENERO': 
+                case 'ENE': 
+                case '1': return 1;
+                case 'FEBRERO': 
+                case 'FEB': 
+                case '2': return 2;
+                case 'MARZO': 
+                case 'MAR': 
+                case '3': return 3;
+                case 'ABRIL': 
+                case 'ABR': 
+                case '4': return 4;
+                case 'MAYO': 
+                case 'MAY': 
+                case '5': return 5;
+                case 'JUNIO': 
+                case 'JUN': 
+                case '6': return 6;
+                case 'JULIO': 
+                case 'JUL': 
+                case '7': return 7;
+                case 'AGOSTO': 
+                case 'AGO': 
+                case '8': return 8;
+                case 'SEPTIEMBRE': 
+                case 'SEP': 
+                case '9': return 9;
+                case 'OCTUBRE': 
+                case 'OCT': 
+                case '10': return 10;
+                case 'NOVIEMBRE': 
+                case 'NOV': 
+                case '11': return 11;
+                case 'DICIEMBRE': 
+                case 'DIC': 
+                case '12': return 12;
                 default: return 99; // Coloca los meses múltiples al final
             }
         }
@@ -468,15 +492,13 @@
             
             const monthArray = Array.from(months).map(m => {
                 // Heurística para detectar meses combinados (como "ENERO-ABRIL" o "ENERO Y ABRIL")
-                const isMultiMonth = m.includes('-') || m.includes('Y');
+                const isMultiMonth = m.includes('-') || m.includes('Y') || m.includes('/');
                 let sortValue = getMonthValue(m);
 
                 // Si es multi-mes, o no tiene un nombre de mes claro, forzamos al final (valor 99)
                 if (isMultiMonth || sortValue === 99) {
                     sortValue = 99;
-                } else {
-                    // Si es un mes simple, usamos su valor numérico para el orden
-                }
+                } 
 
                 return { name: m, sortValue: sortValue };
             });

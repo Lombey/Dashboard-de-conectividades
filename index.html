@@ -30,7 +30,7 @@
             </div>
             <div class="text-sm opacity-80 flex items-center gap-2">
                 <span id="currentDateDisplay"></span> 
-                <span>| Panel v3.30</span>
+                <span>| Panel v3.36</span>
             </div>
         </div>
     </nav>
@@ -77,33 +77,47 @@
             </div>
         </div>
 
-        <!-- KPI Cards -->
-        <div id="kpiSection" class="hidden grid grid-cols-1 md:grid-cols-5 gap-4">
+        <!-- KPI Cards (6 columns now) -->
+        <div id="kpiSection" class="hidden grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            
+            <!-- 1. Conectividades (Casos Activos) -->
             <div class="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500 card">
                 <div class="text-slate-500 text-sm font-semibold uppercase">Conectividades</div>
                 <div class="text-3xl font-bold mt-1" id="kpiTotal">0</div>
+                <div class="text-xs text-slate-400 mt-1">Casos activos</div>
             </div>
             
+            <!-- 2. Cobradas (Cantidad) -->
             <div class="bg-white p-4 rounded-lg shadow border-l-4 border-green-500 card">
-                <div class="text-slate-500 text-sm font-semibold uppercase">Cantidad Cobrada</div>
+                <div class="text-slate-500 text-sm font-semibold uppercase">COBRADAS</div>
                 <div class="text-3xl font-bold mt-1 text-green-700" id="kpiCollected">0</div>
                 <div class="text-xs text-slate-400 mt-1">Casos cerrados</div>
             </div>
             
+            <!-- 3. Cobradas % -->
             <div class="bg-white p-4 rounded-lg shadow border-l-4 border-yellow-500 card">
                 <div class="text-slate-500 text-sm font-semibold uppercase">Cobradas</div>
                 <div class="text-3xl font-bold mt-1" id="kpiEfficiencyNet">0%</div>
-                <div class="text-xs text-slate-400 mt-1">Vs. Total Sin Bajas</div>
+                <div class="text-xs text-slate-400 mt-1">Casos cerrados</div>
             </div>
             
+            <!-- 4. Casos Excluidos (Susp./No se cobra) -->
             <div class="bg-white p-4 rounded-lg shadow border-l-4 border-orange-500 card">
-                <div class="text-slate-500 text-sm font-semibold uppercase">CASOS EXCLUIDOS</div>
+                <div class="text-slate-500 text-sm font-semibold uppercase">EXCLUIDOS</div>
                 <div class="text-3xl font-bold mt-1" id="kpiBajas">0</div>
                 <div class="text-xs text-slate-400 mt-1">Suspendidas/No se cobra</div> 
             </div>
+
+            <!-- 5. Bonificadas (NUEVO KPI) -->
+            <div class="bg-white p-4 rounded-lg shadow border-l-4 border-purple-500 card">
+                <div class="text-slate-500 text-sm font-semibold uppercase">Bonificadas</div>
+                <div class="text-3xl font-bold mt-1" id="kpiBonificadas">0</div>
+                <div class="text-xs text-slate-400 mt-1">Inc. concesionarios</div> 
+            </div>
             
+            <!-- 6. Alerta (+3 días) -->
             <div class="bg-white p-4 rounded-lg shadow border-l-4 border-red-500 card">
-                <div class="text-slate-500 text-sm font-semibold uppercase">Alerta (>3 días)</div>
+                <div class="text-slate-500 text-sm font-semibold uppercase">ALERTAS (+3 DÍAS)</div>
                 <div class="text-3xl font-bold mt-1 text-red-600" id="kpiStagnant">0</div>
                 <div class="text-xs text-slate-400 mt-1">Requieren gestión</div>
             </div>
@@ -477,6 +491,7 @@
             let cobradas = 0;
             let stagnantTotal = 0;
             let bajasTotal = 0;
+            let bonificadasTotal = 0; // NUEVO CONTADOR PARA BONIFICADAS
             
             const categoryCounts = { 'DISPUTAS_O_TRABAS': 0, 'PENDIENTES_PAGO': 0, 'CONTACTADO': 0, 'COBRADAS': 0, 'EXCLUIDO': 0 };
             const stagnantGroups = { 'DISPUTAS_O_TRABAS': [], 'PENDIENTES_PAGO': [], 'CONTACTADO': [] };
@@ -498,7 +513,12 @@
                 const category = categorizeStatus(statusRaw);
                 categoryCounts[category] = (categoryCounts[category] || 0) + 1;
 
-                // CORRECCIÓN: KPI EXCLUIDOS SOLO CUENTA BAJAS REALES (Suspendido/Bonificada)
+                // CONTADOR ESPECÍFICO PARA BONIFICADAS
+                if (statusRaw.toUpperCase().includes('BONIFICADA')) {
+                    bonificadasTotal++;
+                }
+
+                // KPI EXCLUIDOS (Solo Bajas Reales: Suspendido/No se cobra/Bonificada)
                 if (category === 'EXCLUIDO') {
                     bajasTotal++;
                 }
@@ -520,7 +540,7 @@
                     cobradas++;
                     collectorStats[collector].cobrada++;
                 } else if (category !== 'EXCLUIDO') {
-                    // Pendientes: suma trabajo activo (Incluyendo Disputas que requieren gestión)
+                    // Pendientes: suma trabajo activo (Incluyendo Disputas)
                     collectorStats[collector].pending++;
                 }
 
@@ -545,9 +565,12 @@
             globalTotalSinBajas = total - bajasTotal; 
             const finalAdjustedTotal = globalTotalSinBajas;
 
-            document.getElementById('kpiTotal').textContent = total;
+            // ACTUALIZACION CLAVE: kpiTotal ahora muestra CASOS ACTIVOS
+            document.getElementById('kpiTotal').textContent = finalAdjustedTotal; 
             document.getElementById('kpiStagnant').textContent = stagnantTotal;
             document.getElementById('kpiBajas').textContent = bajasTotal;
+            document.getElementById('kpiBonificadas').textContent = bonificadasTotal; // NUEVO KPI
+            
 
             const conversionRate = finalAdjustedTotal > 0 ? Math.round((cobradas / finalAdjustedTotal) * 100) : 0;
             document.getElementById('kpiCollected').textContent = cobradas;

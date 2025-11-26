@@ -30,7 +30,7 @@
             </div>
             <div class="text-sm opacity-80 flex items-center gap-2">
                 <span id="currentDateDisplay"></span> 
-                <span>| Panel v3.36</span>
+                <span>| Panel v3.37</span>
             </div>
         </div>
     </nav>
@@ -192,6 +192,8 @@
         document.addEventListener('DOMContentLoaded', () => {
             const today = new Date();
             document.getElementById('currentDateDisplay').textContent = 'Fecha: ' + today.toLocaleDateString('es-AR');
+            // Carga inicial de datos
+            loadDataFromSheet();
         });
 
         document.getElementById('importBtn').addEventListener('click', loadDataFromSheet);
@@ -436,6 +438,25 @@
             return 'CONTACTADO'; 
         }
 
+        function getMonthValue(monthName) {
+            const normalizedName = monthName.toUpperCase().replace(/\s/g, '');
+            switch (normalizedName) {
+                case 'ENERO': return 1;
+                case 'FEBRERO': return 2;
+                case 'MARZO': return 3;
+                case 'ABRIL': return 4;
+                case 'MAYO': return 5;
+                case 'JUNIO': return 6;
+                case 'JULIO': return 7;
+                case 'AGOSTO': return 8;
+                case 'SEPTIEMBRE': return 9;
+                case 'OCTUBRE': return 10;
+                case 'NOVIEMBRE': return 11;
+                case 'DICIEMBRE': return 12;
+                default: return 99; // Coloca los meses múltiples al final
+            }
+        }
+
         function populateMonthFilter() {
             const months = new Set();
             rawData.forEach(row => {
@@ -444,15 +465,41 @@
                     if (month) months.add(month.trim().toUpperCase());
                 }
             });
+            
+            const monthArray = Array.from(months).map(m => {
+                // Heurística para detectar meses combinados (como "ENERO-ABRIL" o "ENERO Y ABRIL")
+                const isMultiMonth = m.includes('-') || m.includes('Y');
+                let sortValue = getMonthValue(m);
+
+                // Si es multi-mes, o no tiene un nombre de mes claro, forzamos al final (valor 99)
+                if (isMultiMonth || sortValue === 99) {
+                    sortValue = 99;
+                } else {
+                    // Si es un mes simple, usamos su valor numérico para el orden
+                }
+
+                return { name: m, sortValue: sortValue };
+            });
+
+            monthArray.sort((a, b) => {
+                // Ordenar por valor numérico (1, 2, 3...)
+                if (a.sortValue < b.sortValue) return -1;
+                if (a.sortValue > b.sortValue) return 1;
+                // Si tienen el mismo valor (ej. ambos son 99, o ambos 4), ordenar alfabéticamente
+                return a.name.localeCompare(b.name);
+            });
+
             const select = document.getElementById('monthFilter');
             const currentSelection = select.value; 
             select.innerHTML = '<option value="TODOS">Todos</option>';
-            Array.from(months).sort().forEach(m => {
+            
+            monthArray.forEach(m => {
                 const opt = document.createElement('option');
-                opt.value = m;
-                opt.textContent = m;
+                opt.value = m.name;
+                opt.textContent = m.name;
                 select.appendChild(opt);
             });
+            
             if (currentSelection && Array.from(select.options).some(o => o.value === currentSelection)) {
                 select.value = currentSelection;
             }

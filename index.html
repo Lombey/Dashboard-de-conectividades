@@ -24,74 +24,38 @@
             </div>
             <div class="text-sm opacity-80 flex items-center gap-2">
                 <span id="currentDateDisplay"></span> 
-                <span>| Panel v3.4 (Google Sheets)</span>
+                <span>| Panel v3.10</span>
             </div>
         </div>
     </nav>
 
     <div class="container mx-auto p-4 md:p-6 space-y-6">
 
-        <!-- Data Load & Diagnostic Area -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- Google Sheets Input -->
-            <div class="bg-white p-6 rounded-lg shadow-md border border-slate-200">
-                <h2 class="text-lg font-semibold mb-4 text-slate-700 flex items-center gap-2">
-                    <i class="fa-brands fa-google text-green-600"></i> 1. Conexión a Google Sheets
-                </h2>
-                <div class="flex flex-col gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Enlace de la Hoja (Público/Compartido)</label>
+        <!-- Controls Area (Compact & Manual) -->
+        <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+            <div class="flex flex-col md:flex-row gap-4 items-end justify-between">
+                
+                <!-- Data Source Config -->
+                <div class="w-full md:w-1/2">
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Origen de Datos (Google Sheets)</label>
+                    <div class="flex gap-2">
                         <input type="text" id="sheetUrlInput" 
                                value="https://docs.google.com/spreadsheets/d/1wVjmZDIWLZvwunf7NrkqSh91yE2e31a286Y0zFDsZRE/edit?usp=sharing" 
-                               class="w-full border-gray-300 rounded-md shadow-sm p-2 border text-sm focus:ring-blue-500 focus:border-blue-500 text-slate-600"
-                               placeholder="Pega aquí el link de Google Sheets..." />
-                    </div>
-                    <button id="loadSheetBtn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition flex justify-center items-center gap-2">
-                        <span id="btnSpinner" class="hidden animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
-                        <span id="btnText">Importar Datos</span>
-                    </button>
-                    <p class="text-xs text-slate-400">Nota: La hoja debe tener permisos de "Cualquiera con el enlace puede ver".</p>
-                </div>
-            </div>
-
-            <!-- Diagnostic Panel -->
-            <div id="diagnosticPanel" class="hidden bg-yellow-50 p-6 rounded-lg shadow-md border border-yellow-200">
-                <h2 class="text-lg font-bold mb-2 text-yellow-800"><i class="fa-solid fa-stethoscope mr-2"></i>Diagnóstico de Datos</h2>
-                <div class="text-sm space-y-2 text-yellow-900">
-                    <div class="flex justify-between">
-                        <span>Filas Totales Leídas:</span>
-                        <span class="font-bold" id="diagTotalRows">0</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span>Filas con Errores de Lectura:</span>
-                        <span class="font-bold text-red-600" id="diagErrors">0</span>
-                    </div>
-                    <div id="errorDetails" class="hidden mt-2 p-2 bg-red-100 text-red-800 text-xs rounded border border-red-200 max-h-32 overflow-y-auto">
-                        <!-- Errors injected here -->
-                    </div>
-                    <hr class="border-yellow-300 my-2">
-                    <div class="flex justify-between">
-                        <span>Filas identificadas en <span id="diagMonthName" class="font-bold">...</span>:</span>
-                        <span class="font-bold text-blue-800" id="diagMonthCount">0</span>
+                               class="w-full bg-slate-50 border-gray-200 rounded text-xs text-slate-500 px-2 py-1 focus:ring-0 border-0"
+                               readonly />
+                        <button id="importBtn" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-1 px-4 rounded whitespace-nowrap flex items-center gap-2 transition shadow-sm">
+                            <i class="fa-solid fa-cloud-arrow-down"></i> 
+                            <span id="btnText">Importar Datos</span>
+                        </button>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- Filters (Hidden Initially) -->
-        <div id="filterSection" class="hidden bg-white p-6 rounded-lg shadow-md border border-slate-200">
-            <h2 class="text-lg font-semibold mb-4 text-slate-700">2. Filtro Operativo</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Mes de Vencimiento</label>
-                    <select id="monthFilter" class="w-full border-gray-300 rounded-md shadow-sm p-2 border focus:ring-blue-500 focus:border-blue-500">
-                        <option value="TODOS">Todos</option>
+                <!-- Filter -->
+                <div class="w-full md:w-1/3">
+                    <label class="block text-sm font-bold text-slate-700 mb-1">Filtrar por Mes de Vencimiento</label>
+                    <select id="monthFilter" class="w-full border-blue-300 rounded-md shadow-sm p-2 border-2 focus:ring-blue-500 focus:border-blue-500 bg-blue-50 text-blue-900 font-semibold disabled:opacity-50" disabled>
+                        <option value="TODOS">Esperando datos...</option>
                     </select>
-                </div>
-                <div class="flex items-end">
-                    <button id="applyFiltersBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition">
-                        Actualizar Tablero
-                    </button>
                 </div>
             </div>
         </div>
@@ -148,6 +112,7 @@
                             <th class="px-6 py-3">Responsable</th>
                             <th class="px-6 py-3">Total Asignado</th>
                             <th class="px-6 py-3 text-green-700">Cobradas</th>
+                            <th class="px-6 py-3 text-yellow-600">Pendientes</th> <!-- Suma de todo lo activo no cobrado -->
                             <th class="px-6 py-3 text-red-600">Alerta (+3 días)</th>
                             <th class="px-6 py-3">Última Gestión</th>
                         </tr>
@@ -181,7 +146,6 @@
 
     <script>
         let rawData = [];
-        let parseErrors = [];
         let statusChartInstance = null;
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -189,108 +153,126 @@
             document.getElementById('currentDateDisplay').textContent = 'Fecha: ' + today.toLocaleDateString('es-AR');
         });
 
-        // --- GOOGLE SHEETS IMPORT LOGIC ---
-        document.getElementById('loadSheetBtn').addEventListener('click', async () => {
+        document.getElementById('importBtn').addEventListener('click', loadDataFromSheet);
+        document.getElementById('monthFilter').addEventListener('change', runDashboard);
+
+        // --- DATA LOADING ---
+        async function loadDataFromSheet() {
             const urlInput = document.getElementById('sheetUrlInput').value;
-            const spinner = document.getElementById('btnSpinner');
+            const btn = document.getElementById('importBtn');
             const btnText = document.getElementById('btnText');
+            const filterSelect = document.getElementById('monthFilter');
+            
+            btn.disabled = true;
+            btn.classList.add('opacity-75', 'cursor-wait');
+            btnText.textContent = "Cargando...";
 
             if (!urlInput) {
-                alert("Por favor ingresa un enlace de Google Sheets.");
+                alert("No hay enlace de hoja configurado.");
+                resetBtn();
                 return;
             }
 
-            // Extract Spreadsheet ID
-            // Pattern: /d/([a-zA-Z0-9-_]+)
             const match = urlInput.match(/\/d\/([a-zA-Z0-9-_]+)/);
             if (!match || !match[1]) {
-                alert("El enlace no parece válido. Asegúrate de copiar el link completo de Google Sheets.");
+                alert("Enlace inválido. Verifica la URL.");
+                resetBtn();
                 return;
             }
+            
             const sheetId = match[1];
             const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
+            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(csvUrl)}`;
 
-            // UI Loading State
-            spinner.classList.remove('hidden');
-            btnText.textContent = "Cargando...";
-            
             try {
-                const response = await fetch(csvUrl);
-                if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
-                const csvText = await response.text();
+                await fetchAndParse(csvUrl);
+                finishLoading();
+            } catch (error1) {
+                console.warn("Intento directo fallido, probando proxy...", error1);
+                try {
+                    await fetchAndParse(proxyUrl);
+                    finishLoading();
+                } catch (error2) {
+                    console.error(error2);
+                    alert("No se pudo conectar. Verifica que la hoja sea pública o tenga el enlace compartido correctamente.");
+                    resetBtn();
+                }
+            }
 
-                // Process CSV Text with PapaParse
-                Papa.parse(csvText, {
-                    header: false,
-                    skipEmptyLines: true,
-                    quoteChar: '"',
-                    escapeChar: '"',
-                    complete: function(results) {
-                        handleParseResults(results);
-                        spinner.classList.add('hidden');
-                        btnText.textContent = "Datos Actualizados";
-                        setTimeout(() => btnText.textContent = "Importar Datos", 2000);
-                    }
-                });
-
-            } catch (error) {
-                console.error(error);
-                alert("Error al cargar la hoja. Asegúrate de que el enlace sea público o visible para 'Cualquiera con el enlace'.\n\nDetalle: " + error.message);
-                spinner.classList.add('hidden');
+            function resetBtn() {
+                btn.disabled = false;
+                btn.classList.remove('opacity-75', 'cursor-wait');
                 btnText.textContent = "Importar Datos";
             }
-        });
+
+            function finishLoading() {
+                btn.disabled = false;
+                btn.classList.remove('opacity-75', 'cursor-wait');
+                btn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                btn.classList.add('bg-green-600', 'hover:bg-green-700');
+                btnText.textContent = "Datos Actualizados";
+                filterSelect.disabled = false;
+                setTimeout(() => {
+                    btn.classList.remove('bg-green-600', 'hover:bg-green-700');
+                    btn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                    btnText.textContent = "Recargar Datos";
+                }, 3000);
+            }
+        }
+
+        function fetchAndParse(url) {
+            return new Promise(async (resolve, reject) => {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+                try {
+                    const response = await fetch(url, { signal: controller.signal });
+                    clearTimeout(timeoutId);
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    const csvText = await response.text();
+                    if (!csvText || csvText.length < 50) throw new Error("Respuesta vacía");
+
+                    Papa.parse(csvText, {
+                        header: false,
+                        skipEmptyLines: true,
+                        quoteChar: '"',
+                        escapeChar: '"',
+                        complete: function(results) {
+                            handleParseResults(results);
+                            resolve();
+                        },
+                        error: function(err) { reject(err); }
+                    });
+                } catch (err) {
+                    clearTimeout(timeoutId);
+                    reject(err);
+                }
+            });
+        }
 
         function handleParseResults(results) {
-            parseErrors = results.errors;
             const totalRowsRead = results.data.length;
-            
             if (totalRowsRead > 1) {
-                rawData = results.data.slice(1); // Remove header
+                rawData = results.data.slice(1);
+                populateMonthFilter();
+                document.getElementById('kpiSection').classList.remove('hidden');
+                document.getElementById('dashboardContent').classList.remove('hidden');
+                runDashboard();
             } else {
-                rawData = [];
+                throw new Error("Datos insuficientes.");
             }
-
-            console.log("Filas leídas:", totalRowsRead);
-            updateDiagnosticPanel(totalRowsRead, parseErrors);
-
-            populateMonthFilter();
-            document.getElementById('filterSection').classList.remove('hidden');
-            runDashboard(); // Auto-run if possible
         }
 
-        // --- CORE LOGIC: CATEGORIZACIÓN ---
+        // --- LOGIC ---
         function categorizeStatus(statusRaw) {
             const s = (statusRaw || '').toUpperCase();
-            
             if (s.includes('NO SE COBRA') || s.includes('SUSPENDIDO') || s.includes('BONIFICADA') || s.includes('EXCLUIDO')) return 'EXCLUIDO';
             if (s.includes('RECLAMO') || s.includes('DISPUTA') || s.includes('ERROR') || s.includes('PROBLEMA') || s.includes('DEVUELT')) return 'RECLAMOS';
-            
             const isExplicitSuccess = s.includes('YA PAGO') || s.includes('PAGADO') || s.includes('COBRADA') || s.includes('COBRADO') || s.includes('ABONADO') || s.includes('CERRAD');
             if (isExplicitSuccess) return 'COBRADAS'; 
-
             if (s.includes('FACTURA') || s.includes('FC') || s.includes('ENVIAD') || s.includes('ADMIN') || s.includes('NOTA DE') || s.includes('PENDIENTE') || s.includes('ESPERA') || s.includes('PAGO') || s.includes('A PAGAR')) return 'PENDIENTES_PAGO'; 
-
             return 'CONTACTADO'; 
         }
-
-        function updateDiagnosticPanel(total, errors) {
-            const panel = document.getElementById('diagnosticPanel');
-            panel.classList.remove('hidden');
-            document.getElementById('diagTotalRows').textContent = total;
-            document.getElementById('diagErrors').textContent = errors.length;
-            
-            const errDiv = document.getElementById('errorDetails');
-            if (errors.length > 0) {
-                errDiv.classList.remove('hidden');
-                errDiv.innerHTML = errors.map(e => `<div>Fila ${e.row}: ${e.message}</div>`).join('');
-            } else {
-                errDiv.classList.add('hidden');
-                errDiv.innerHTML = '';
-            }
-        }
-
-        document.getElementById('applyFiltersBtn').addEventListener('click', runDashboard);
 
         function populateMonthFilter() {
             const months = new Set();
@@ -301,6 +283,7 @@
                 }
             });
             const select = document.getElementById('monthFilter');
+            const currentSelection = select.value; 
             select.innerHTML = '<option value="TODOS">Todos</option>';
             Array.from(months).sort().forEach(m => {
                 const opt = document.createElement('option');
@@ -308,6 +291,9 @@
                 opt.textContent = m;
                 select.appendChild(opt);
             });
+            if (currentSelection && Array.from(select.options).some(o => o.value === currentSelection)) {
+                select.value = currentSelection;
+            }
         }
 
         function parseDate(dateStr) {
@@ -338,7 +324,6 @@
             const FECHA_CAMBIO_INDEX = 15;
 
             const selectedMonth = document.getElementById('monthFilter').value;
-            document.getElementById('diagMonthName').textContent = selectedMonth === 'TODOS' ? 'Total' : selectedMonth;
 
             let total = 0;
             let cobradas = 0;
@@ -347,18 +332,13 @@
             
             const categoryCounts = { 'RECLAMOS': 0, 'PENDIENTES_PAGO': 0, 'CONTACTADO': 0, 'COBRADAS': 0, 'EXCLUIDO': 0 };
             const stagnantGroups = { 'RECLAMOS': [], 'PENDIENTES_PAGO': [], 'CONTACTADO': [] };
+            
+            // Initialize pending property
             const collectorStats = {};
             
-            let diagnosticMonthMatchCount = 0;
-
             rawData.forEach(row => {
                 if (row.length < 10) return; 
-
                 const rowMonth = (row[8] || '').trim().toUpperCase();
-                if (selectedMonth === 'TODOS' || rowMonth === selectedMonth) {
-                    diagnosticMonthMatchCount++;
-                }
-
                 if (selectedMonth !== 'TODOS' && rowMonth !== selectedMonth) return;
 
                 total++;
@@ -373,7 +353,7 @@
 
                 if (category === 'EXCLUIDO') bajasTotal++;
 
-                if (!collectorStats[collector]) collectorStats[collector] = { name: collector, total: 0, cobrada: 0, stagnant: 0, lastDate: null };
+                if (!collectorStats[collector]) collectorStats[collector] = { name: collector, total: 0, cobrada: 0, pending: 0, stagnant: 0, lastDate: null };
                 
                 const fullDateParts = dateStr && dateStr.includes(' ') ? (dateStr.split(' ')[1] || '00:00:00').split(':') : ['00','00','00'];
                 const fullDateObj = dateObj ? new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate(), fullDateParts[0], fullDateParts[1], fullDateParts[2]) : null;
@@ -390,6 +370,12 @@
                     cobradas++;
                     collectorStats[collector].cobrada++;
                 } else if (category !== 'EXCLUIDO') {
+                    // Nueva Lógica: Pendientes incluye Todo lo que NO es Cobrado NI Excluido
+                    // Esto abarca: CONTACTADO, PENDIENTES_PAGO y RECLAMOS
+                    collectorStats[collector].pending++;
+                }
+
+                if (category !== 'EXCLUIDO') {
                     if (daysDiff > 3 || daysDiff === 999) {
                         stagnantTotal++;
                         collectorStats[collector].stagnant++;
@@ -406,18 +392,13 @@
                 }
             });
 
-            document.getElementById('diagMonthCount').textContent = diagnosticMonthMatchCount;
-
             const finalAdjustedTotal = total - bajasTotal;
-            document.getElementById('kpiSection').classList.remove('hidden');
-            document.getElementById('dashboardContent').classList.remove('hidden');
 
             document.getElementById('kpiTotal').textContent = total;
             document.getElementById('kpiStagnant').textContent = stagnantTotal;
             document.getElementById('kpiBajas').textContent = bajasTotal;
 
             const conversionRate = finalAdjustedTotal > 0 ? Math.round((cobradas / finalAdjustedTotal) * 100) : 0;
-            
             document.getElementById('kpiCollected').textContent = cobradas;
             document.getElementById('kpiEfficiencyNet').textContent = conversionRate + '%';
 
@@ -443,6 +424,7 @@
                     <td class="px-6 py-4 font-medium text-slate-900">${stat.name}</td>
                     <td class="px-6 py-4">${stat.total}</td>
                     <td class="px-6 py-4 text-green-600 font-bold">${stat.cobrada}</td>
+                    <td class="px-6 py-4 text-yellow-600 font-bold">${stat.pending}</td>
                     <td class="px-6 py-4 text-red-600 font-bold">${stat.stagnant}</td>
                     <td class="px-6 py-4 text-slate-500 text-xs">${lastInteraction}</td>
                 `;

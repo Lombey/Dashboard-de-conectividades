@@ -31,7 +31,7 @@
             </div>
             <div class="text-sm opacity-90 flex items-center gap-2 font-semibold">
                 <span id="currentDateDisplay"></span> 
-                <span>| Panel v3.45</span>
+                <span>| Panel v3.46</span>
             </div>
         </div>
     </nav>
@@ -678,7 +678,8 @@
             
             const sortedStats = Object.values(stats)
                 .filter(stat => stat.total > 0 || stat.name !== 'SIN ASIGNAR')
-                .sort((a, b) => b.total - a.total);
+                // --- CAMBIO AQUÍ: Ordenar por nombre (Alfabético) ---
+                .sort((a, b) => a.name.localeCompare(b.name)); 
 
             sortedStats.forEach(stat => {
                 const tr = document.createElement('tr');

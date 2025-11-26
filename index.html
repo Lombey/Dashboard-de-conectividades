@@ -22,15 +22,16 @@
 <body class="bg-slate-50 text-slate-800">
 
     <!-- Navbar (Oculta en PDF) -->
-    <nav class="bg-blue-900 text-white p-4 shadow-lg">
+    <nav class="bg-[#9bc438] text-white p-4 shadow-lg"> <!-- Color Verde actualizado -->
         <div class="container mx-auto flex justify-between items-center">
             <div class="flex items-center gap-3">
-                <i class="fa-solid fa-chart-line text-2xl"></i>
-                <h1 class="text-xl font-bold tracking-wide">Gestión de Cobranzas</h1>
+                <!-- Logo de Corvus sin fondo blanco -->
+                <img src="new_corvus_logo.png" alt="Corvus Logo" class="h-10 mr-2"> 
+                <h1 class="text-xl font-bold tracking-wide text-white drop-shadow-md">Gestión de Cobranzas</h1>
             </div>
-            <div class="text-sm opacity-80 flex items-center gap-2">
+            <div class="text-sm opacity-90 flex items-center gap-2 font-semibold">
                 <span id="currentDateDisplay"></span> 
-                <span>| Panel v3.41</span>
+                <span>| Panel v3.44</span>
             </div>
         </div>
     </nav>
@@ -49,7 +50,7 @@
                                value="https://docs.google.com/spreadsheets/d/1wVjmZDIWLZvwunf7NrkqSh91yE2e31a286Y0zFDsZRE/edit?usp=sharing" 
                                class="w-full bg-slate-50 border-gray-200 rounded text-xs text-slate-500 px-2 py-1 focus:ring-0 border-0"
                                readonly />
-                        <button id="importBtn" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-1 px-4 rounded whitespace-nowrap flex items-center gap-2 transition shadow-sm">
+                        <button id="importBtn" class="bg-[#9bc438] hover:bg-green-600 text-white text-xs font-bold py-1 px-4 rounded whitespace-nowrap flex items-center gap-2 transition shadow-sm"> <!-- Botón con nuevo color -->
                             <i class="fa-solid fa-cloud-arrow-down"></i> 
                             <span id="btnText">Importar Datos</span>
                         </button>
@@ -59,7 +60,7 @@
                 <!-- Filter & PDF Button Container -->
                 <div class="w-full md:w-1/2 flex gap-4 items-end justify-end">
                     <!-- Filter -->
-                    <div class="w-1/2">
+                    <div class="w-1/2" id="monthFilterContainer">
                         <label class="block text-sm font-bold text-slate-700 mb-1">Filtrar por Mes de Vencimiento</label>
                         <select id="monthFilter" class="w-full border-blue-300 rounded-md shadow-sm p-2 border-2 focus:ring-blue-500 focus:border-blue-500 bg-blue-50 text-blue-900 font-semibold disabled:opacity-50" disabled>
                             <option value="TODOS">Esperando datos...</option>
@@ -67,7 +68,7 @@
                     </div>
 
                     <!-- PDF Button -->
-                    <div class="w-1/4">
+                    <div class="w-1/4" id="pdfButtonContainer">
                         <button id="downloadPdfBtn" class="w-full bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-2 px-4 rounded transition shadow-md disabled:opacity-50 flex items-center justify-center gap-2" disabled>
                             <i class="fa-solid fa-file-pdf"></i> 
                             <span id="pdfBtnText">PDF</span> 
@@ -212,9 +213,16 @@
 
             // 2. Ocultar elementos que NO deben ir en el PDF
             const navbar = document.querySelector('nav');
+            const pdfButtonContainer = document.getElementById('pdfButtonContainer');
+            const monthFilterContainer = document.getElementById('monthFilterContainer');
+            const dataSourceConfig = document.getElementById('dataSourceConfig');
+
             navbar.style.display = 'none';
-            controlsSection.style.display = 'none'; 
-            
+            pdfButtonContainer.style.display = 'none';
+            dataSourceConfig.style.display = 'none';
+            monthFilterContainer.classList.remove('w-1/2'); 
+            monthFilterContainer.style.width = '100%'; 
+
             // 3. Get current state info para el header fijo
             const reportDate = document.getElementById('currentDateDisplay').textContent;
             const selectedMonth = document.getElementById('monthFilter').options[document.getElementById('monthFilter').selectedIndex].text;
@@ -228,8 +236,11 @@
             
             // 5. Restaurar elementos ocultos
             navbar.style.display = 'block';
-            controlsSection.style.display = 'block'; 
-
+            pdfButtonContainer.style.display = 'block';
+            dataSourceConfig.style.display = 'block';
+            monthFilterContainer.classList.add('w-1/2');
+            monthFilterContainer.style.width = ''; 
+            
             // 6. Crear PDF
             const { jsPDF } = window.jspdf;
             const pdf = new jsPDF('p', 'mm', 'a4');
@@ -354,8 +365,8 @@
                 btn.disabled = false;
                 pdfBtn.disabled = true;
                 btn.classList.remove('opacity-75', 'cursor-wait');
-                btn.classList.remove('bg-green-600', 'hover:bg-green-700');
-                btn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                btn.classList.remove('bg-[#9bc438]', 'hover:bg-green-600'); 
+                btn.classList.add('bg-[#9bc438]', 'hover:bg-green-600'); 
                 btnText.textContent = "Importar Datos";
                 filterSelect.disabled = true;
                 filterSelect.innerHTML = '<option value="TODOS">Esperando datos...</option>';
@@ -365,7 +376,7 @@
                 btn.disabled = false;
                 pdfBtn.disabled = false;
                 btn.classList.remove('opacity-75', 'cursor-wait');
-                btn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                btn.classList.remove('bg-[#9bc438]', 'hover:bg-green-600'); 
                 btn.classList.add('bg-green-600', 'hover:bg-green-700');
                 btnText.textContent = "Datos Actualizados";
                 filterSelect.disabled = false;
@@ -373,7 +384,7 @@
                 document.getElementById('dashboardContent').classList.remove('hidden');
                 setTimeout(() => {
                     btn.classList.remove('bg-green-600', 'hover:bg-green-700');
-                    btn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                    btn.classList.add('bg-[#9bc438]', 'hover:bg-green-600'); 
                     btnText.textContent = "Recargar Datos";
                 }, 3000);
             }
@@ -431,8 +442,8 @@
             const isExplicitSuccess = s.includes('YA PAGO') || s.includes('PAGADO') || s.includes('COBRADA') || s.includes('COBRADO') || s.includes('ABONADO') || s.includes('CERRAD');
             if (isExplicitSuccess) return 'COBRADAS'; 
 
-            // 3. ASIGNADAS (NUEVO: Inicio de ciclo, antes de CONTACTADO)
-            if (s.includes('ASIGNADA')) return 'ASIGNADA';
+            // 3. ASIGNADAS (NUEVO: Vacío o explícito)
+            if (s === '' || s.includes('ASIGNADA')) return 'ASIGNADA';
 
             // 4. DISPUTAS/ERRORES (Trabas)
             if (s.includes('RECLAMO') || s.includes('DISPUTA') || s.includes('ERROR') || s.includes('PROBLEMA') || s.includes('DEVUELT')) return 'DISPUTAS_O_TRABAS';
@@ -440,49 +451,25 @@
             // 5. PENDIENTES DE PAGO (Facturación)
             if (s.includes('FACTURA') || s.includes('FC') || s.includes('ENVIAD') || s.includes('ADMIN') || s.includes('NOTA DE') || s.includes('PENDIENTE') || s.includes('ESPERA') || s.includes('PAGO') || s.includes('A PAGAR')) return 'PENDIENTES_PAGO'; 
             
-            // 6. CONTACTADO (Seguimiento, si no es ASIGNADA)
+            // 6. CONTACTADO (Seguimiento)
             return 'CONTACTADO'; 
         }
 
         function getMonthValue(monthName) {
             const normalizedName = monthName.toUpperCase().replace(/\s/g, '');
             switch (normalizedName) {
-                case 'ENERO': 
-                case 'ENE': 
-                case '1': return 1;
-                case 'FEBRERO': 
-                case 'FEB': 
-                case '2': return 2;
-                case 'MARZO': 
-                case 'MAR': 
-                case '3': return 3;
-                case 'ABRIL': 
-                case 'ABR': 
-                case '4': return 4;
-                case 'MAYO': 
-                case 'MAY': 
-                case '5': return 5;
-                case 'JUNIO': 
-                case 'JUN': 
-                case '6': return 6;
-                case 'JULIO': 
-                case 'JUL': 
-                case '7': return 7;
-                case 'AGOSTO': 
-                case 'AGO': 
-                case '8': return 8;
-                case 'SEPTIEMBRE': 
-                case 'SEP': 
-                case '9': return 9;
-                case 'OCTUBRE': 
-                case 'OCT': 
-                case '10': return 10;
-                case 'NOVIEMBRE': 
-                case 'NOV': 
-                case '11': return 11;
-                case 'DICIEMBRE': 
-                case 'DIC': 
-                case '12': return 12;
+                case 'ENERO': case 'ENE': case '1': return 1;
+                case 'FEBRERO': case 'FEB': case '2': return 2;
+                case 'MARZO': case 'MAR': case '3': return 3;
+                case 'ABRIL': case 'ABR': case '4': return 4;
+                case 'MAYO': case 'MAY': case '5': return 5;
+                case 'JUNIO': case 'JUN': case '6': return 6;
+                case 'JULIO': case 'JUL': case '7': return 7;
+                case 'AGOSTO': case 'AGO': case '8': return 8;
+                case 'SEPTIEMBRE': case 'SEP': case '9': return 9;
+                case 'OCTUBRE': case 'OCT': case '10': return 10;
+                case 'NOVIEMBRE': case 'NOV': case '11': return 11;
+                case 'DICIEMBRE': case 'DIC': case '12': return 12;
                 default: return 99; 
             }
         }
@@ -564,7 +551,6 @@
             let bajasTotal = 0;
             let bonificadasTotal = 0; 
             
-            // AÑADIR ASIGNADA A LAS CUENTAS DE CATEGORÍA
             const categoryCounts = { 'ASIGNADA': 0, 'DISPUTAS_O_TRABAS': 0, 'PENDIENTES_PAGO': 0, 'CONTACTADO': 0, 'COBRADAS': 0, 'EXCLUIDO': 0 };
             const stagnantGroups = { 'DISPUTAS_O_TRABAS': [], 'PENDIENTES_PAGO': [], 'CONTACTADO': [], 'ASIGNADA': [] };
             const collectorStats = {};
@@ -613,13 +599,10 @@
                     collectorStats[collector].pending++;
                 }
 
-                // Cálculo de Alertas: Incluye ASIGNADA como estado activo no cerrado.
                 if (category !== 'EXCLUIDO' && category !== 'COBRADAS') {
                     if (daysDiff > 3 || daysDiff === 999) {
                         stagnantTotal++;
                         collectorStats[collector].stagnant++;
-                        
-                        // Agregar a su grupo de alerta, incluyendo el nuevo ASIGNADA
                         if (stagnantGroups[category]) {
                             stagnantGroups[category].push({
                                 client: row[2] || row[4] || 'Cliente Desconocido',
@@ -656,7 +639,6 @@
             renderCollectorsTable(collectorStats, grandTotalAssigned, grandTotalCobradas, grandTotalPendientes, grandTotalAlerta);
             renderStagnantGroup('list-reclamos', 'count-reclamos', stagnantGroups['DISPUTAS_O_TRABAS'], 'bg-white border-l-4 border-red-500');
             renderStagnantGroup('list-facturas', 'count-facturas', stagnantGroups['PENDIENTES_PAGO'], 'bg-white border-l-4 border-blue-500');
-            // La lista de CONTACTADO ahora también debe incluir las ASIGNADAS estancadas
             const stagnantContactado = stagnantGroups['CONTACTADO'].concat(stagnantGroups['ASIGNADA']);
             renderStagnantGroup('list-contactos', 'count-contactos', stagnantContactado, 'bg-white border-l-4 border-yellow-500');
         }
@@ -743,13 +725,11 @@
             const ctx = document.getElementById('statusChart').getContext('2d');
             if (statusChartInstance) statusChartInstance.destroy();
             
-            // Ordenamos la distribución: Asignada (Inicio) -> Contactado -> Pendientes -> Cobradas (Fin)
             const internalLabels = ['ASIGNADA', 'CONTACTADO', 'PENDIENTES_PAGO', 'COBRADAS'];
             const displayLabels = ['ASIGNADAS', 'CONTACTADO', 'PENDIENTES PAGO', 'COBRADAS'];
             
             const activeUniverse = totalUniverse;
             
-            // Sumamos solo los elementos que van en la barra (Excluyendo Bajas/Disputas)
             const data = internalLabels.map(key => dataObj[key] || 0);
             
             if (activeUniverse === 0) {
@@ -765,25 +745,25 @@
                 {
                     label: displayLabels[0],
                     data: [data[0]],
-                    backgroundColor: ['#60a5fa'], // Azul Claro
+                    backgroundColor: ['#60a5fa'], 
                     stack: 'Stack 0',
                 },
                 {
                     label: displayLabels[1],
                     data: [data[1]],
-                    backgroundColor: ['#fde047'], // Amarillo Intenso (Contactado)
+                    backgroundColor: ['#fde047'], 
                     stack: 'Stack 0',
                 },
                 {
                     label: displayLabels[2],
                     data: [data[2]],
-                    backgroundColor: ['#3b82f6'], // Azul
+                    backgroundColor: ['#3b82f6'], 
                     stack: 'Stack 0',
                 },
                 {
                     label: displayLabels[3],
                     data: [data[3]],
-                    backgroundColor: ['#22c55e'], // Verde
+                    backgroundColor: ['#22c55e'], 
                     stack: 'Stack 0',
                 },
             ];
@@ -818,7 +798,7 @@
                             } 
                         },
                         datalabels: {
-                            color: '#1f2937', // Texto más oscuro para mejor contraste
+                            color: '#1f2937', 
                             font: { weight: 'bold', size: 12 },
                             formatter: (value, context) => {
                                 const percent = (value * 100 / activeUniverse).toFixed(0); 

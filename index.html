@@ -163,14 +163,14 @@
                 <table class="min-w-full text-sm text-left text-slate-600">
                     <thead class="text-xs text-slate-700 uppercase bg-slate-100">
                         <tr>
-                            <th class="px-6 py-3">Responsable</th>
-                            <th class="px-6 py-3">Total</th>
-                            <th class="px-6 py-3 text-blue-600">Facturadas</th>
-                            <th class="px-6 py-3 text-yellow-600">Facturac pendiente</th>
-                            <th class="px-6 py-3 text-green-700">Cobradas</th>
-                            <th class="px-6 py-3 text-blue-700 font-bold">Efectividad Cobro</th>
-                            <th class="px-6 py-3 text-red-600">Alerta (+3 días)</th>
-                            <th class="px-6 py-3">Última Gestión</th>
+                            <th class="px-6 py-3 text-left">Responsable</th>
+                            <th class="px-6 py-3 text-center">Total</th>
+                            <th class="px-6 py-3 text-blue-600 text-center">Facturadas</th>
+                            <th class="px-6 py-3 text-yellow-600 text-center">Facturac pendiente</th>
+                            <th class="px-6 py-3 text-green-700 text-center">Cobradas</th>
+                            <th class="px-6 py-3 text-blue-700 font-bold text-center">Efectividad Cobro</th>
+                            <th class="px-6 py-3 text-red-600 text-center">Alerta (+3 días)</th>
+                            <th class="px-6 py-3 text-center">Última Gestión</th>
                         </tr>
                     </thead>
                     <tbody id="collectorsTableBody"></tbody>
@@ -799,14 +799,14 @@
                 }
 
                 tr.innerHTML = `
-                    <td class="px-6 py-4 font-medium text-slate-900">${stat.name}</td>
-                    <td class="px-6 py-4">${stat.total}</td>
-                    <td class="px-6 py-4 text-blue-600 font-bold">${stat.facturadas}</td>
-                    <td class="px-6 py-4 text-yellow-600 font-bold">${stat.pending - stat.facturadas}</td>
-                    <td class="px-6 py-4 text-green-600 font-bold">${stat.cobrada}</td>
-                    <td class="px-6 py-4 text-blue-700 font-bold">${effectiveness}%</td>
-                    <td class="px-6 py-4 text-red-600 font-bold">${stat.stagnant}</td>
-                    <td class="px-6 py-4 text-slate-500 text-xs">${lastInteraction}</td>
+                    <td class="px-6 py-4 font-medium text-slate-900 text-left">${stat.name}</td>
+                    <td class="px-6 py-4 text-center">${stat.total}</td>
+                    <td class="px-6 py-4 text-blue-600 font-bold text-center">${stat.facturadas}</td>
+                    <td class="px-6 py-4 text-yellow-600 font-bold text-center">${stat.pending - stat.facturadas}</td>
+                    <td class="px-6 py-4 text-green-600 font-bold text-center">${stat.cobrada}</td>
+                    <td class="px-6 py-4 text-blue-700 font-bold text-center">${effectiveness}%</td>
+                    <td class="px-6 py-4 text-red-600 font-bold text-center">${stat.stagnant}</td>
+                    <td class="px-6 py-4 text-slate-500 text-xs text-center">${lastInteraction}</td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -817,14 +817,14 @@
             const totalEffectivenessRow = totalActiveRow > 0 ? Math.round((grandTotalCobradas / totalActiveRow) * 100) : 0;
 
             trTotal.innerHTML = `
-                <td class="px-6 py-4">TOTAL</td>
-                <td class="px-6 py-4">${grandTotalAssigned}</td>
-                <td class="px-6 py-4 text-blue-600">${grandTotalFacturadas}</td>
-                <td class="px-6 py-4 text-yellow-600">${grandTotalPendientes - grandTotalFacturadas}</td>
-                <td class="px-6 py-4 text-green-700">${grandTotalCobradas}</td>
-                <td class="px-6 py-4 text-blue-700">${totalEffectivenessRow}%</td>
-                <td class="px-6 py-4 text-red-600">${grandTotalAlerta}</td>
-                <td class="px-6 py-4">-</td>
+                <td class="px-6 py-4 text-left">TOTAL</td>
+                <td class="px-6 py-4 text-center">${grandTotalAssigned}</td>
+                <td class="px-6 py-4 text-blue-600 text-center">${grandTotalFacturadas}</td>
+                <td class="px-6 py-4 text-yellow-600 text-center">${grandTotalPendientes - grandTotalFacturadas}</td>
+                <td class="px-6 py-4 text-green-700 text-center">${grandTotalCobradas}</td>
+                <td class="px-6 py-4 text-blue-700 text-center">${totalEffectivenessRow}%</td>
+                <td class="px-6 py-4 text-red-600 text-center">${grandTotalAlerta}</td>
+                <td class="px-6 py-4 text-center">-</td>
             `;
             tbody.appendChild(trTotal);
         }

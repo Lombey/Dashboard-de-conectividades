@@ -807,7 +807,7 @@
                 }
                 let effectFact = 0;
                 if (stat.total > 0) {
-                    effectFact = Math.round((stat.facturadas / stat.total) * 100);
+                    effectFact = Math.round(((stat.facturadas + stat.cobrada) / stat.total) * 100);
                 }
 
                 tr.innerHTML = `
@@ -828,7 +828,7 @@
             trTotal.className = "bg-slate-200 border-t-2 border-slate-500 font-extrabold text-slate-900";
             const totalActiveRow = grandTotalCobradas + grandTotalPendientes;
             const totalEffectCobroRow = totalActiveRow > 0 ? Math.round((grandTotalCobradas / totalActiveRow) * 100) : 0;
-            const totalEffectFactRow = grandTotalAssigned > 0 ? Math.round((grandTotalFacturadas / grandTotalAssigned) * 100) : 0;
+            const totalEffectFactRow = grandTotalAssigned > 0 ? Math.round(((grandTotalFacturadas + grandTotalCobradas) / grandTotalAssigned) * 100) : 0;
 
             trTotal.innerHTML = `
                 <td class="px-6 py-4 text-left">TOTAL</td>

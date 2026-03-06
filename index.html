@@ -229,12 +229,16 @@
         // Register ChartDataLabels plugin explicitly
         Chart.register(ChartDataLabels);
 
-        // Alias para jspdf
         const { jsPDF } = window.jspdf;
+
+        // Índices de columnas del Google Sheet
+        const COL_MES = 8;
+        const COL_QUIEN_COBRA = 13;
+        const COL_ESTADO = 14;
+        const COL_FECHA_CAMBIO = 15;
 
         let rawData = [];
         let statusChartInstance = null;
-        let globalTotalSinBajas = 0;
 
         document.addEventListener('DOMContentLoaded', () => {
             const today = new Date();
@@ -537,34 +541,31 @@
             }
         }
 
-        function fetchAndParse(url) {
-            return new Promise(async (resolve, reject) => {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 8000);
+        async function fetchAndParse(url) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-                try {
-                    const response = await fetch(url, { signal: controller.signal });
-                    clearTimeout(timeoutId);
-                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                    const csvText = await response.text();
-                    if (!csvText || csvText.length < 50) throw new Error("Respuesta vacía");
+            try {
+                const response = await fetch(url, { signal: controller.signal });
+                clearTimeout(timeoutId);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const csvText = await response.text();
+                if (!csvText || csvText.length < 50) throw new Error("Respuesta vacía");
 
+                return new Promise((resolve, reject) => {
                     Papa.parse(csvText, {
                         header: false,
                         skipEmptyLines: true,
                         quoteChar: '"',
                         escapeChar: '"',
-                        complete: function (results) {
-                            handleParseResults(results);
-                            resolve();
-                        },
-                        error: function (err) { reject(err); }
+                        complete(results) { handleParseResults(results); resolve(); },
+                        error(err) { reject(err); }
                     });
-                } catch (err) {
-                    clearTimeout(timeoutId);
-                    reject(err);
-                }
-            });
+                });
+            } catch (err) {
+                clearTimeout(timeoutId);
+                throw err;
+            }
         }
 
         function handleParseResults(results) {
@@ -572,33 +573,30 @@
             if (totalRowsRead > 1) {
                 rawData = results.data.slice(1);
                 populateMonthFilter();
-                // runDashboard() is now called inside finishLoading()
+                // runDashboard() se llama desde finishLoading()
             } else {
                 throw new Error("Datos insuficientes.");
             }
         }
 
-        // --- CORE CALCULATIONS ---
+        // --- CORE: Categorización de estados ---
+        // Orden de prioridad: los checks más específicos primero
         function categorizeStatus(statusRaw) {
             const s = (statusRaw || '').toUpperCase();
 
-            // 1. EXCLUIDO (Bajas/Fugas)
-            if (s.includes('NO SE COBRA') || s.includes('SUSPENDIDO') || s.includes('BONIFICADA') || s.includes('EXCLUIDO')) return 'EXCLUIDO';
+            if (s.includes('BONIFICADA')) return 'BONIFICADA';
+            if (s.includes('NO SE COBRA') || s.includes('SUSPENDIDO') || s.includes('EXCLUIDO')) return 'EXCLUIDO';
 
-            // 2. COBRADAS (Éxito)
-            const isExplicitSuccess = s.includes('YA PAGO') || s.includes('PAGADO') || s.includes('COBRADA') || s.includes('COBRADO') || s.includes('ABONADO') || s.includes('CERRAD');
-            if (isExplicitSuccess) return 'COBRADAS';
+            const esExito = s.includes('YA PAGO') || s.includes('PAGADO') || s.includes('COBRADA') || s.includes('COBRADO') || s.includes('ABONADO') || s.includes('CERRAD');
+            if (esExito) return 'COBRADAS';
 
-            // 3. ASIGNADAS (NUEVO: Vacío o explícito)
             if (s === '' || s.includes('ASIGNADA')) return 'ASIGNADA';
 
-            // 4. PENDIENTES DE PAGO (Facturación) — antes de DISPUTAS para que "FACTURA PENDIENTE - RECLAMO" no caiga en disputas
+            // PENDIENTES antes de DISPUTAS: "FACTURA PENDIENTE - RECLAMO" es pendiente, no disputa
             if (s.includes('FACTURA') || s.includes('FC') || s.includes('ENVIAD') || s.includes('ADMIN') || s.includes('NOTA DE') || s.includes('PENDIENTE') || s.includes('ESPERA') || s.includes('PAGO') || s.includes('A PAGAR')) return 'PENDIENTES_PAGO';
 
-            // 5. DISPUTAS/ERRORES (Trabas)
             if (s.includes('RECLAMO') || s.includes('DISPUTA') || s.includes('ERROR') || s.includes('PROBLEMA') || s.includes('DEVUELT')) return 'DISPUTAS_O_TRABAS';
 
-            // 6. CONTACTADO (Seguimiento)
             return 'CONTACTADO';
         }
 
@@ -624,8 +622,8 @@
         function populateMonthFilter() {
             const months = new Set();
             rawData.forEach(row => {
-                if (row.length > 8) {
-                    const month = row[8];
+                if (row.length > COL_MES) {
+                    const month = row[COL_MES];
                     if (month) months.add(month.trim().toUpperCase());
                 }
             });
@@ -685,66 +683,50 @@
             return Math.floor(diffTime / MS_PER_DAY);
         }
 
-        function runDashboard() {
-            const QUIEN_COBRA_INDEX = 13;
-            const ESTADO_INDEX = 14;
-            const FECHA_CAMBIO_INDEX = 15;
+        // Procesa las filas filtradas y devuelve todas las métricas
+        function computeMetrics(rows) {
+            let total = 0, cobradas = 0, stagnantTotal = 0, bajasTotal = 0, bonificadasTotal = 0;
 
-            const selectedMonth = document.getElementById('monthFilter').value;
-
-            let total = 0;
-            let cobradas = 0;
-            let stagnantTotal = 0;
-            let bajasTotal = 0;
-            let bonificadasTotal = 0;
-
-            const categoryCounts = { 'ASIGNADA': 0, 'DISPUTAS_O_TRABAS': 0, 'PENDIENTES_PAGO': 0, 'CONTACTADO': 0, 'COBRADAS': 0, 'EXCLUIDO': 0 };
-            const stagnantGroups = { 'DISPUTAS_O_TRABAS': [], 'PENDIENTES_PAGO': [], 'CONTACTADO': [], 'ASIGNADA': [] };
+            const categoryCounts = { ASIGNADA: 0, DISPUTAS_O_TRABAS: 0, PENDIENTES_PAGO: 0, CONTACTADO: 0, COBRADAS: 0, EXCLUIDO: 0, BONIFICADA: 0 };
+            const stagnantGroups = { DISPUTAS_O_TRABAS: [], PENDIENTES_PAGO: [], CONTACTADO: [], ASIGNADA: [] };
             const collectorStats = {};
 
-            rawData.forEach(row => {
-                if (row.length < 16) return;
-
-                const rowMonth = (row[8] || '').trim().toUpperCase();
-                if (selectedMonth !== 'TODOS' && rowMonth !== selectedMonth) return;
+            rows.forEach(row => {
+                if (row.length <= COL_FECHA_CAMBIO) return;
 
                 total++;
-                const collector = (row[QUIEN_COBRA_INDEX] || 'SIN ASIGNAR').trim().toUpperCase();
-                const statusRaw = (row[ESTADO_INDEX] || 'SIN ESTADO').trim();
-                const dateStr = row[FECHA_CAMBIO_INDEX];
+                const collector = (row[COL_QUIEN_COBRA] || 'SIN ASIGNAR').trim().toUpperCase();
+                const statusRaw = (row[COL_ESTADO] || 'SIN ESTADO').trim();
+                const dateStr = row[COL_FECHA_CAMBIO];
                 const dateObj = parseDate(dateStr);
                 const daysDiff = getDaysDiff(dateObj);
-
                 const category = categorizeStatus(statusRaw);
+
                 categoryCounts[category] = (categoryCounts[category] || 0) + 1;
 
-                const isBonif = statusRaw.toUpperCase().includes('BONIFICADA');
-                if (isBonif) {
-                    bonificadasTotal++;
-                } else if (category === 'EXCLUIDO') {
-                    bajasTotal++;
+                if (category === 'BONIFICADA') bonificadasTotal++;
+                else if (category === 'EXCLUIDO') bajasTotal++;
+
+                if (!collectorStats[collector]) {
+                    collectorStats[collector] = { name: collector, total: 0, cobrada: 0, pending: 0, facturadas: 0, stagnant: 0, lastDate: null };
                 }
 
-                if (!collectorStats[collector]) collectorStats[collector] = { name: collector, total: 0, cobrada: 0, pending: 0, facturadas: 0, bonificadas: 0, stagnant: 0, lastDate: null };
-
+                // Última gestión (con hora)
                 const fullDateParts = dateStr && dateStr.includes(' ') ? (dateStr.split(' ')[1] || '00:00:00').split(':') : ['00', '00', '00'];
                 const fullDateObj = dateObj ? new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate(), fullDateParts[0], fullDateParts[1], fullDateParts[2]) : null;
-
-                if (fullDateObj) {
-                    if (!collectorStats[collector].lastDate || fullDateObj > collectorStats[collector].lastDate) {
-                        collectorStats[collector].lastDate = fullDateObj;
-                    }
+                if (fullDateObj && (!collectorStats[collector].lastDate || fullDateObj > collectorStats[collector].lastDate)) {
+                    collectorStats[collector].lastDate = fullDateObj;
                 }
 
-                if (isBonif) {
-                    collectorStats[collector].bonificadas++;
+                // Stats por agente: bonificados y excluidos no cuentan
+                if (category === 'BONIFICADA' || category === 'EXCLUIDO') {
+                    // No suman al total cobrable del agente
                 } else {
                     collectorStats[collector].total++;
-
                     if (category === 'COBRADAS') {
                         cobradas++;
                         collectorStats[collector].cobrada++;
-                    } else if (category !== 'EXCLUIDO') {
+                    } else {
                         collectorStats[collector].pending++;
                         if (category === 'PENDIENTES_PAGO') {
                             collectorStats[collector].facturadas++;
@@ -752,51 +734,60 @@
                     }
                 }
 
-                if (category !== 'EXCLUIDO' && category !== 'COBRADAS') {
-                    if (daysDiff > 3 || daysDiff === 999) {
-                        stagnantTotal++;
-                        collectorStats[collector].stagnant++;
-                        if (stagnantGroups[category]) {
-                            stagnantGroups[category].push({
-                                client: row[2] || row[4] || 'Cliente Desconocido',
-                                collector: collector,
-                                rawStatus: statusRaw,
-                                dateStr: dateStr || 'Sin Fecha',
-                                days: daysDiff
-                            });
-                        }
+                // Alertas: casos activos sin movimiento > 3 días
+                const esActivo = category !== 'EXCLUIDO' && category !== 'BONIFICADA' && category !== 'COBRADAS';
+                if (esActivo && (daysDiff > 3 || daysDiff === 999)) {
+                    stagnantTotal++;
+                    collectorStats[collector].stagnant++;
+                    if (stagnantGroups[category]) {
+                        stagnantGroups[category].push({
+                            client: row[2] || row[4] || 'Cliente Desconocido',
+                            collector, rawStatus: statusRaw,
+                            dateStr: dateStr || 'Sin Fecha',
+                            days: daysDiff
+                        });
                     }
                 }
             });
 
-            globalTotalSinBajas = total - bajasTotal;
-            const finalAdjustedTotal = globalTotalSinBajas;
-            const totalFacturable = finalAdjustedTotal - bonificadasTotal;
+            const totalCobrable = total - bajasTotal - bonificadasTotal;
 
-            document.getElementById('kpiTotal').textContent = total;
-            document.getElementById('kpiBajas').textContent = bajasTotal;
-            document.getElementById('kpiBonificadas').textContent = bonificadasTotal;
-            document.getElementById('kpiCobrable').textContent = totalFacturable;
-            document.getElementById('kpiStagnant').textContent = stagnantTotal;
+            return { total, cobradas, stagnantTotal, bajasTotal, bonificadasTotal, totalCobrable, categoryCounts, stagnantGroups, collectorStats };
+        }
 
+        // Filtra filas por mes y orquesta el render completo
+        function runDashboard() {
+            const selectedMonth = document.getElementById('monthFilter').value;
 
-            const conversionRate = totalFacturable > 0 ? Math.round((cobradas / totalFacturable) * 100) : 0;
-            document.getElementById('kpiCollected').textContent = cobradas;
+            const filteredRows = rawData.filter(row => {
+                if (row.length <= COL_FECHA_CAMBIO) return false;
+                if (selectedMonth === 'TODOS') return true;
+                return (row[COL_MES] || '').trim().toUpperCase() === selectedMonth;
+            });
+
+            const m = computeMetrics(filteredRows);
+
+            // KPIs
+            document.getElementById('kpiTotal').textContent = m.total;
+            document.getElementById('kpiBajas').textContent = m.bajasTotal;
+            document.getElementById('kpiBonificadas').textContent = m.bonificadasTotal;
+            document.getElementById('kpiCobrable').textContent = m.totalCobrable;
+            document.getElementById('kpiCollected').textContent = m.cobradas;
+            document.getElementById('kpiStagnant').textContent = m.stagnantTotal;
+
+            const conversionRate = m.totalCobrable > 0 ? Math.round((m.cobradas / m.totalCobrable) * 100) : 0;
             document.getElementById('kpiEfficiencyNet').textContent = conversionRate + '%';
 
-            const grandTotalAssigned = totalFacturable;
-            const grandTotalCobradas = cobradas;
-            const grandTotalPendientes = totalFacturable - cobradas;
-            const grandTotalAlerta = stagnantTotal;
-            const grandTotalFacturadas = categoryCounts['PENDIENTES_PAGO'] || 0;
+            // Totales para la tabla
+            const facturadas = m.categoryCounts['PENDIENTES_PAGO'] || 0;
+            const pendientes = m.totalCobrable - m.cobradas;
 
-
-            updateStatusChart(categoryCounts, finalAdjustedTotal);
-            renderCollectorsTable(collectorStats, grandTotalAssigned, grandTotalCobradas, grandTotalPendientes, grandTotalAlerta, grandTotalFacturadas);
-            renderStagnantGroup('list-reclamos', 'count-reclamos', stagnantGroups['DISPUTAS_O_TRABAS'], 'bg-white border-l-4 border-red-500');
-            renderStagnantGroup('list-facturas', 'count-facturas', stagnantGroups['PENDIENTES_PAGO'], 'bg-white border-l-4 border-blue-500');
-            const stagnantContactado = stagnantGroups['CONTACTADO'].concat(stagnantGroups['ASIGNADA']);
-            renderStagnantGroup('list-contactos', 'count-contactos', stagnantContactado, 'bg-white border-l-4 border-yellow-500');
+            // Renders
+            updateStatusChart(m.categoryCounts, m.totalCobrable);
+            renderCollectorsTable(m.collectorStats, m.totalCobrable, m.cobradas, pendientes, m.stagnantTotal, facturadas);
+            renderStagnantGroup('list-reclamos', 'count-reclamos', m.stagnantGroups['DISPUTAS_O_TRABAS'], 'bg-white border-l-4 border-red-500');
+            renderStagnantGroup('list-facturas', 'count-facturas', m.stagnantGroups['PENDIENTES_PAGO'], 'bg-white border-l-4 border-blue-500');
+            renderStagnantGroup('list-contactos', 'count-contactos', m.stagnantGroups['CONTACTADO'].concat(m.stagnantGroups['ASIGNADA']), 'bg-white border-l-4 border-yellow-500');
         }
 
         function renderCollectorsTable(stats, grandTotalAssigned, grandTotalCobradas, grandTotalPendientes, grandTotalAlerta, grandTotalFacturadas) {
@@ -805,7 +796,6 @@
 
             const sortedStats = Object.values(stats)
                 .filter(stat => stat.total > 0 || stat.name !== 'SIN ASIGNAR')
-                // --- CAMBIO AQUÍ: Ordenar por nombre (Alfabético) ---
                 .sort((a, b) => a.name.localeCompare(b.name));
 
             sortedStats.forEach(stat => {
@@ -887,18 +877,18 @@
             });
         }
 
-        function updateStatusChart(dataObj, totalUniverse) {
+        function updateStatusChart(dataObj, totalCobrable) {
             const ctx = document.getElementById('statusChart').getContext('2d');
             if (statusChartInstance) statusChartInstance.destroy();
 
-            const internalLabels = ['ASIGNADA', 'CONTACTADO', 'PENDIENTES_PAGO', 'COBRADAS'];
-            const displayLabels = ['ASIGNADAS', 'CONTACTADO', 'PENDIENTES PAGO', 'COBRADAS'];
+            const categories = [
+                { key: 'ASIGNADA',        label: 'ASIGNADAS',       color: '#60a5fa' },
+                { key: 'CONTACTADO',      label: 'CONTACTADO',      color: '#fde047' },
+                { key: 'PENDIENTES_PAGO', label: 'PENDIENTES PAGO', color: '#3b82f6' },
+                { key: 'COBRADAS',        label: 'COBRADAS',        color: '#22c55e' },
+            ];
 
-            const activeUniverse = totalUniverse;
-
-            const data = internalLabels.map(key => dataObj[key] || 0);
-
-            if (activeUniverse === 0) {
+            if (totalCobrable === 0) {
                 ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
                 ctx.font = '16px Inter';
                 ctx.fillStyle = '#94a3b8';
@@ -907,71 +897,33 @@
                 return;
             }
 
-            const datasets = [
-                {
-                    label: displayLabels[0],
-                    data: [data[0]],
-                    backgroundColor: ['#60a5fa'],
-                    stack: 'Stack 0',
-                },
-                {
-                    label: displayLabels[1],
-                    data: [data[1]],
-                    backgroundColor: ['#fde047'],
-                    stack: 'Stack 0',
-                },
-                {
-                    label: displayLabels[2],
-                    data: [data[2]],
-                    backgroundColor: ['#3b82f6'],
-                    stack: 'Stack 0',
-                },
-                {
-                    label: displayLabels[3],
-                    data: [data[3]],
-                    backgroundColor: ['#22c55e'],
-                    stack: 'Stack 0',
-                },
-            ];
-
             statusChartInstance = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels: ['Distribución'],
-                    datasets: datasets,
+                    datasets: categories.map(cat => ({
+                        label: cat.label,
+                        data: [dataObj[cat.key] || 0],
+                        backgroundColor: [cat.color],
+                        stack: 'Stack 0',
+                    })),
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     indexAxis: 'y',
                     scales: {
-                        x: {
-                            stacked: true,
-                            display: false,
-                            max: activeUniverse,
-                        },
-                        y: {
-                            stacked: true,
-                            display: false,
-                        }
+                        x: { stacked: true, display: false, max: totalCobrable },
+                        y: { stacked: true, display: false },
                     },
                     plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: {
-                                boxWidth: 10,
-                                font: { size: 11 }
-                            }
-                        },
+                        legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } },
                         datalabels: {
                             color: '#1f2937',
                             font: { weight: 'bold', size: 12 },
                             formatter: (value, context) => {
-                                const percent = (value * 100 / activeUniverse).toFixed(0);
-                                let fullLabel = context.dataset.label;
-
                                 if (value === 0) return '';
-                                return `${fullLabel}: ${percent}%`;
+                                return `${context.dataset.label}: ${(value * 100 / totalCobrable).toFixed(0)}%`;
                             }
                         }
                     }

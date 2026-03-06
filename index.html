@@ -168,7 +168,8 @@
                             <th class="px-6 py-3 text-blue-600 text-center">Facturadas</th>
                             <th class="px-6 py-3 text-yellow-600 text-center">Facturac pendiente</th>
                             <th class="px-6 py-3 text-green-700 text-center">Cobradas</th>
-                            <th class="px-6 py-3 text-blue-700 font-bold text-center">Efectividad Cobro</th>
+                            <th class="px-6 py-3 text-purple-700 font-bold text-center">Efect. Facturación</th>
+                            <th class="px-6 py-3 text-blue-700 font-bold text-center">Efect. Cobro</th>
                             <th class="px-6 py-3 text-red-600 text-center">Alerta (+3 días)</th>
                             <th class="px-6 py-3 text-center">Última Gestión</th>
                         </tr>
@@ -180,7 +181,7 @@
             <!-- Stagnant Lists -->
             <div class="bg-white p-4 rounded-lg shadow">
                 <h3 class="font-bold text-slate-800 mb-6 flex items-center gap-2 text-lg border-b pb-2">
-                    <i class="fa-solid fa-bell text-red-500"></i> Casos sin movimiento (> 3 días)
+                    <i class="fa-solid fa-bell text-red-500"></i> Casos sin movimiento (&gt; 3 días)
                 </h3>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div class="bg-red-50 rounded-lg p-3 border border-red-100">
@@ -576,11 +577,11 @@
             // 3. ASIGNADAS (NUEVO: Vacío o explícito)
             if (s === '' || s.includes('ASIGNADA')) return 'ASIGNADA';
 
-            // 4. DISPUTAS/ERRORES (Trabas)
-            if (s.includes('RECLAMO') || s.includes('DISPUTA') || s.includes('ERROR') || s.includes('PROBLEMA') || s.includes('DEVUELT')) return 'DISPUTAS_O_TRABAS';
-
-            // 5. PENDIENTES DE PAGO (Facturación)
+            // 4. PENDIENTES DE PAGO (Facturación) — antes de DISPUTAS para que "FACTURA PENDIENTE - RECLAMO" no caiga en disputas
             if (s.includes('FACTURA') || s.includes('FC') || s.includes('ENVIAD') || s.includes('ADMIN') || s.includes('NOTA DE') || s.includes('PENDIENTE') || s.includes('ESPERA') || s.includes('PAGO') || s.includes('A PAGAR')) return 'PENDIENTES_PAGO';
+
+            // 5. DISPUTAS/ERRORES (Trabas)
+            if (s.includes('RECLAMO') || s.includes('DISPUTA') || s.includes('ERROR') || s.includes('PROBLEMA') || s.includes('DEVUELT')) return 'DISPUTAS_O_TRABAS';
 
             // 6. CONTACTADO (Seguimiento)
             return 'CONTACTADO';
@@ -710,7 +711,7 @@
                     bajasTotal++;
                 }
 
-                if (!collectorStats[collector]) collectorStats[collector] = { name: collector, total: 0, cobrada: 0, pending: 0, facturadas: 0, stagnant: 0, lastDate: null };
+                if (!collectorStats[collector]) collectorStats[collector] = { name: collector, total: 0, cobrada: 0, pending: 0, facturadas: 0, bonificadas: 0, stagnant: 0, lastDate: null };
 
                 const fullDateParts = dateStr && dateStr.includes(' ') ? (dateStr.split(' ')[1] || '00:00:00').split(':') : ['00', '00', '00'];
                 const fullDateObj = dateObj ? new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate(), fullDateParts[0], fullDateParts[1], fullDateParts[2]) : null;
@@ -721,15 +722,21 @@
                     }
                 }
 
-                collectorStats[collector].total++;
+                const isBonificada = statusRaw.toUpperCase().includes('BONIFICADA');
 
-                if (category === 'COBRADAS') {
-                    cobradas++;
-                    collectorStats[collector].cobrada++;
-                } else if (category !== 'EXCLUIDO') {
-                    collectorStats[collector].pending++;
-                    if (category === 'PENDIENTES_PAGO') {
-                        collectorStats[collector].facturadas++;
+                if (isBonificada) {
+                    collectorStats[collector].bonificadas++;
+                } else {
+                    collectorStats[collector].total++;
+
+                    if (category === 'COBRADAS') {
+                        cobradas++;
+                        collectorStats[collector].cobrada++;
+                    } else if (category !== 'EXCLUIDO') {
+                        collectorStats[collector].pending++;
+                        if (category === 'PENDIENTES_PAGO') {
+                            collectorStats[collector].facturadas++;
+                        }
                     }
                 }
 
@@ -752,6 +759,7 @@
 
             globalTotalSinBajas = total - bajasTotal;
             const finalAdjustedTotal = globalTotalSinBajas;
+            const totalFacturable = finalAdjustedTotal - bonificadasTotal;
 
             document.getElementById('kpiTotal').textContent = finalAdjustedTotal;
             document.getElementById('kpiStagnant').textContent = stagnantTotal;
@@ -759,13 +767,13 @@
             document.getElementById('kpiBonificadas').textContent = bonificadasTotal;
 
 
-            const conversionRate = finalAdjustedTotal > 0 ? Math.round((cobradas / finalAdjustedTotal) * 100) : 0;
+            const conversionRate = totalFacturable > 0 ? Math.round((cobradas / totalFacturable) * 100) : 0;
             document.getElementById('kpiCollected').textContent = cobradas;
             document.getElementById('kpiEfficiencyNet').textContent = conversionRate + '%';
 
-            const grandTotalAssigned = total;
+            const grandTotalAssigned = totalFacturable;
             const grandTotalCobradas = cobradas;
-            const grandTotalPendientes = finalAdjustedTotal - cobradas;
+            const grandTotalPendientes = totalFacturable - cobradas;
             const grandTotalAlerta = stagnantTotal;
             const grandTotalFacturadas = categoryCounts['PENDIENTES_PAGO'] || 0;
 
@@ -793,9 +801,13 @@
                 const lastInteraction = stat.lastDate ? stat.lastDate.toLocaleDateString('es-AR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-';
 
                 const activeTotal = stat.pending + stat.cobrada;
-                let effectiveness = 0;
+                let effectCobro = 0;
                 if (activeTotal > 0) {
-                    effectiveness = Math.round((stat.cobrada / activeTotal) * 100);
+                    effectCobro = Math.round((stat.cobrada / activeTotal) * 100);
+                }
+                let effectFact = 0;
+                if (stat.total > 0) {
+                    effectFact = Math.round((stat.facturadas / stat.total) * 100);
                 }
 
                 tr.innerHTML = `
@@ -804,7 +816,8 @@
                     <td class="px-6 py-4 text-blue-600 font-bold text-center">${stat.facturadas}</td>
                     <td class="px-6 py-4 text-yellow-600 font-bold text-center">${stat.pending - stat.facturadas}</td>
                     <td class="px-6 py-4 text-green-600 font-bold text-center">${stat.cobrada}</td>
-                    <td class="px-6 py-4 text-blue-700 font-bold text-center">${effectiveness}%</td>
+                    <td class="px-6 py-4 text-purple-700 font-bold text-center">${effectFact}%</td>
+                    <td class="px-6 py-4 text-blue-700 font-bold text-center">${effectCobro}%</td>
                     <td class="px-6 py-4 text-red-600 font-bold text-center">${stat.stagnant}</td>
                     <td class="px-6 py-4 text-slate-500 text-xs text-center">${lastInteraction}</td>
                 `;
@@ -814,7 +827,8 @@
             const trTotal = document.createElement('tr');
             trTotal.className = "bg-slate-200 border-t-2 border-slate-500 font-extrabold text-slate-900";
             const totalActiveRow = grandTotalCobradas + grandTotalPendientes;
-            const totalEffectivenessRow = totalActiveRow > 0 ? Math.round((grandTotalCobradas / totalActiveRow) * 100) : 0;
+            const totalEffectCobroRow = totalActiveRow > 0 ? Math.round((grandTotalCobradas / totalActiveRow) * 100) : 0;
+            const totalEffectFactRow = grandTotalAssigned > 0 ? Math.round((grandTotalFacturadas / grandTotalAssigned) * 100) : 0;
 
             trTotal.innerHTML = `
                 <td class="px-6 py-4 text-left">TOTAL</td>
@@ -822,7 +836,8 @@
                 <td class="px-6 py-4 text-blue-600 text-center">${grandTotalFacturadas}</td>
                 <td class="px-6 py-4 text-yellow-600 text-center">${grandTotalPendientes - grandTotalFacturadas}</td>
                 <td class="px-6 py-4 text-green-700 text-center">${grandTotalCobradas}</td>
-                <td class="px-6 py-4 text-blue-700 text-center">${totalEffectivenessRow}%</td>
+                <td class="px-6 py-4 text-purple-700 text-center">${totalEffectFactRow}%</td>
+                <td class="px-6 py-4 text-blue-700 text-center">${totalEffectCobroRow}%</td>
                 <td class="px-6 py-4 text-red-600 text-center">${grandTotalAlerta}</td>
                 <td class="px-6 py-4 text-center">-</td>
             `;

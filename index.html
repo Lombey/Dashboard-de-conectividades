@@ -180,10 +180,10 @@
                         <tr>
                             <th class="px-6 py-3 text-left">Responsable</th>
                             <th class="px-6 py-3 text-center">Total</th>
-                            <th class="px-6 py-3 text-blue-600 text-center">Facturadas</th>
-                            <th class="px-6 py-3 text-yellow-600 text-center">Facturac pendiente</th>
+                            <th class="px-6 py-3 text-yellow-600 text-center">Pendiente de FC</th>
+                            <th class="px-6 py-3 text-blue-600 text-center">FC Pend. Cobro</th>
                             <th class="px-6 py-3 text-green-700 text-center">Cobradas</th>
-                            <th class="px-6 py-3 text-purple-700 font-bold text-center">Efect. Facturación</th>
+                            <th class="px-6 py-3 text-purple-700 font-bold text-center">Efect. FC</th>
                             <th class="px-6 py-3 text-blue-700 font-bold text-center">Efect. Cobro</th>
                             <th class="px-6 py-3 text-red-600 text-center">Alerta (+3 días)</th>
                             <th class="px-6 py-3 text-center">Última Gestión</th>
@@ -816,8 +816,8 @@
                 tr.innerHTML = `
                     <td class="px-6 py-4 font-medium text-slate-900 text-left">${stat.name}</td>
                     <td class="px-6 py-4 text-center">${stat.total}</td>
-                    <td class="px-6 py-4 text-blue-600 font-bold text-center">${stat.facturadas}</td>
                     <td class="px-6 py-4 text-yellow-600 font-bold text-center">${stat.pending - stat.facturadas}</td>
+                    <td class="px-6 py-4 text-blue-600 font-bold text-center">${stat.facturadas}</td>
                     <td class="px-6 py-4 text-green-600 font-bold text-center">${stat.cobrada}</td>
                     <td class="px-6 py-4 text-purple-700 font-bold text-center">${effectFact}%</td>
                     <td class="px-6 py-4 text-blue-700 font-bold text-center">${effectCobro}%</td>
@@ -836,8 +836,8 @@
             trTotal.innerHTML = `
                 <td class="px-6 py-4 text-left">TOTAL</td>
                 <td class="px-6 py-4 text-center">${grandTotalAssigned}</td>
-                <td class="px-6 py-4 text-blue-600 text-center">${grandTotalFacturadas}</td>
                 <td class="px-6 py-4 text-yellow-600 text-center">${grandTotalPendientes - grandTotalFacturadas}</td>
+                <td class="px-6 py-4 text-blue-600 text-center">${grandTotalFacturadas}</td>
                 <td class="px-6 py-4 text-green-700 text-center">${grandTotalCobradas}</td>
                 <td class="px-6 py-4 text-purple-700 text-center">${totalEffectFactRow}%</td>
                 <td class="px-6 py-4 text-blue-700 text-center">${totalEffectCobroRow}%</td>
